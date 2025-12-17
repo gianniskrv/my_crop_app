@@ -13,6 +13,20 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
+# 🎨 ΑΠΟΚΡΥΨΗ MENU & MANAGE APP (CSS)
+# ==============================================================================
+# Αυτό το κομμάτι κρύβει το κουμπί Manage App, το μενού και το footer
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .stDeployButton {display:none;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# ==============================================================================
 # 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
@@ -350,13 +364,12 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY) - NEW SECURE VIEW
+    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY)
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
         st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin)")
         st.caption("Διαχείριση εγγεγραμμένων χρηστών. Πατήστε το 👁️ για να δείτε τον κωδικό.")
         
-        # Επικεφαλίδες Πίνακα
         h1, h2, h3, h4, h5 = st.columns([2, 2, 2, 2, 1])
         h1.markdown("**Username**")
         h2.markdown("**Όνομα**")
@@ -365,33 +378,27 @@ else:
         h5.markdown("**Προβολή**")
         st.divider()
 
-        # Λούπα για κάθε χρήστη στη βάση
         for uname, udata in st.session_state.users_db.items():
-            # Δημιουργία στήλης για κάθε στοιχείο
             c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1])
             
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
             
-            # --- LOGIC ΓΙΑ ΤΟ ΜΑΤΑΚΙ ---
-            # Κλειδί για να θυμόμαστε αν είναι ανοιχτό ή κλειστό το ματάκι για τον συγκεκριμένο χρήστη
+            # ΜΑΤΑΚΙ ΓΙΑ ΚΩΔΙΚΟ
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state:
-                st.session_state[toggle_key] = False # Default: Κλειστό
+                st.session_state[toggle_key] = False
             
-            # Εμφάνιση Κωδικού ή Τελείας
             if st.session_state[toggle_key]:
-                c4.warning(f"`{udata['password']}`") # Αν είναι ανοιχτό, δείξτο
-                btn_icon = "🙈" # Κουμπί για κλείσιμο
+                c4.warning(f"`{udata['password']}`")
+                btn_icon = "🙈"
             else:
-                c4.text("••••••••") # Αν είναι κλειστό
-                btn_icon = "👁️" # Κουμπί για άνοιγμα
+                c4.text("••••••••")
+                btn_icon = "👁️"
             
-            # Το Κουμπί
             if c5.button(btn_icon, key=f"btn_{uname}"):
-                # Αλλαγή κατάστασης (True/False)
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
-                st.rerun() # Refresh για να φανεί η αλλαγή
+                st.rerun()
                 
             st.markdown("---")
