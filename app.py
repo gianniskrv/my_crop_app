@@ -66,7 +66,7 @@ if 'users_db' not in st.session_state:
         }
     }
 
-# OWNER - Προστέθηκε το phone
+# OWNER
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "owner", 
@@ -124,7 +124,7 @@ def login_user(username, password):
         if st.session_state.users_db[username]['password'] == password:
             st.session_state.authenticated = True
             st.session_state.current_user = st.session_state.users_db[username]
-            st.session_state.current_username = username # Κρατάμε και το key
+            st.session_state.current_username = username
             st.success(f"Καλωσήρθες {st.session_state.current_user['name']}!")
             time.sleep(1)
             st.rerun()
@@ -162,11 +162,8 @@ if not st.session_state.authenticated:
     col_spacer1, col_login, col_spacer2 = st.columns([1, 2, 1])
     
     with col_login:
-        
-        # --- 1. RESET PASSWORD ---
         if st.session_state.reset_mode:
             st.markdown("### 🔄 Ανάκτηση Κωδικού")
-            
             if st.session_state.reset_step == 1:
                 email_input = st.text_input("Εισάγετε το Email σας:")
                 col_r1, col_r2 = st.columns(2)
@@ -176,16 +173,12 @@ if not st.session_state.authenticated:
                         if udata.get('email') == email_input:
                             found_user = uname
                             break
-                    
                     if found_user:
                         otp = str(random.randint(100000, 999999))
                         st.session_state.reset_otp = otp
                         st.session_state.reset_email_target = email_input
                         st.session_state.reset_username_target = found_user
-                        
-                        body = f"Ο κωδικός επιβεβαίωσης είναι: {otp}"
-                        sent = send_email_notification(email_input, "🔑 Κωδικός Επαναφοράς", body)
-                        
+                        sent = send_email_notification(email_input, "🔑 Κωδικός Επαναφοράς", f"Κωδικός: {otp}")
                         if sent:
                             st.session_state.reset_step = 2
                             st.toast("Ο κωδικός εστάλη!", icon="📧")
@@ -193,52 +186,42 @@ if not st.session_state.authenticated:
                             st.rerun()
                     else:
                         st.error("Δεν βρέθηκε χρήστης.")
-
                 if col_r2.button("Πίσω", use_container_width=True):
                     st.session_state.reset_mode = False
                     st.rerun()
-
             elif st.session_state.reset_step == 2:
                 st.write(f"Κωδικός εστάλη στο: **{st.session_state.reset_email_target}**")
                 code_input = st.text_input("6ψήφιος κωδικός:")
                 new_password = st.text_input("Νέος Κωδικός:", type="password")
-                
                 if st.button("💾 Αλλαγή", use_container_width=True):
                     if code_input == st.session_state.reset_otp:
                         if new_password:
                             uname = st.session_state.reset_username_target
                             st.session_state.users_db[uname]['password'] = new_password
-                            st.success("Επιτυχία! Συνδεθείτε.")
+                            st.success("Επιτυχία!")
                             st.session_state.reset_mode = False
                             st.session_state.reset_step = 1
-                            st.session_state.reset_otp = None
                             time.sleep(2)
                             st.rerun()
                         else:
                             st.warning("Δώστε κωδικό.")
                     else:
                         st.error("Λάθος κωδικός.")
-                        
                 if st.button("Ακύρωση"):
                     st.session_state.reset_mode = False
                     st.session_state.reset_step = 1
                     st.rerun()
-
-        # --- 2. LOGIN / REGISTER ---
         else:
             tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
-            
             with tab1:
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
                 if st.button("Είσοδος", use_container_width=True):
                     login_user(username, password)
-                
                 st.markdown("---")
                 if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True):
                     st.session_state.reset_mode = True
                     st.rerun()
-                    
             with tab2:
                 st.write("Δημιουργήστε νέο λογαριασμό:")
                 new_user = st.text_input("Επιθυμητό Username")
@@ -246,7 +229,6 @@ if not st.session_state.authenticated:
                 new_name = st.text_input("Ονοματεπώνυμο")
                 new_email = st.text_input("Email")
                 new_phone = st.text_input("Κινητό Τηλέφωνο")
-                
                 if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
                     if new_user and new_pass and new_name and new_email:
                         register_user(new_user, new_pass, new_name, new_email, new_phone)
@@ -268,7 +250,7 @@ else:
             "💸 Έξοδα & Ταμείο",          
             "🗂️ Βιβλιοθήκη & Οικονομικά", 
             "☁️ Καιρός & Γεωργία Ακριβείας", 
-            "👤 Το Προφίλ μου", # <--- ΝΕΟ!
+            "👤 Το Προφίλ μου",
             "🆘 Βοήθεια & Υποστήριξη"
         ]
         
@@ -625,11 +607,11 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 5. ΠΡΟΦΙΛ ΧΡΗΣΤΗ (ΝΕΟ!)
+    # 5. ΠΡΟΦΙΛ ΧΡΗΣΤΗ
     # --------------------------------------------------
     elif menu_choice == "👤 Το Προφίλ μου":
         st.header("👤 Το Προφίλ μου")
-        st.caption("Επεξεργασία προσωπικών στοιχείων και ασφάλειας.")
+        st.caption("Επεξεργασία προσωπικών στοιχείων.")
         
         current_data = st.session_state.current_user
         
@@ -640,15 +622,11 @@ else:
                 new_email = c2.text_input("Email:", value=current_data.get('email', ''))
                 
                 c3, c4 = st.columns(2)
-                # Χρήση .get() για ασφάλεια αν λείπει το κλειδί phone
                 new_phone = c3.text_input("Κινητό Τηλέφωνο:", value=current_data.get('phone', ''))
                 new_pass = c4.text_input("Αλλαγή Κωδικού (Αφήστε κενό για διατήρηση):", type="password")
                 
-                st.markdown("---")
-                if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                if st.form_submit_button("💾 Αποθήκευση"):
                     uname = st.session_state.current_username
-                    
-                    # Update DB
                     st.session_state.users_db[uname]['name'] = new_name
                     st.session_state.users_db[uname]['email'] = new_email
                     st.session_state.users_db[uname]['phone'] = new_phone
@@ -657,9 +635,8 @@ else:
                         st.session_state.users_db[uname]['password'] = new_pass
                         st.toast("Ο κωδικός άλλαξε!", icon="🔑")
                     
-                    # Refresh Current Session User
                     st.session_state.current_user = st.session_state.users_db[uname]
-                    st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
+                    st.success("Ενημερώθηκε!")
                     time.sleep(1)
                     st.rerun()
 
@@ -735,25 +712,58 @@ else:
 
         st.divider()
         st.subheader("📋 Λίστα Εγγεγραμμένων")
+        
+        # --- HEADERS ---
+        h1, h2, h3, h4, h5, h6 = st.columns([2, 2, 2, 2, 1, 1])
+        h1.markdown("**Username**")
+        h2.markdown("**Όνομα**")
+        h3.markdown("**Email**")
+        h4.markdown("**Ρόλος (Edit)**")
+        h5.markdown("**Κωδικός**")
+        h6.markdown("**Προβολή**")
+        st.divider()
+
+        # --- LOOP USERS ---
         for uname, udata in st.session_state.users_db.items():
-            c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 1, 1])
+            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 2, 1, 1])
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
-            r = udata['role']
-            if r == 'owner': c4.error("OWNER")
-            elif r == 'admin': c4.warning("ADMIN")
-            else: c4.success("USER")
             
+            # --- ROLE EDIT LOGIC ---
+            r = udata['role']
+            if uname == "GiannisKrv": # OWNER - Δεν αλλάζει
+                c4.error("OWNER (Locked)")
+            else:
+                # Selectbox για αλλαγή ρόλου
+                current_index = 0 if r == 'user' else 1
+                new_role_sel = c4.selectbox(
+                    "Change Role", 
+                    ["user", "admin"], 
+                    index=current_index, 
+                    key=f"role_edit_{uname}",
+                    label_visibility="collapsed"
+                )
+                
+                # Αν αλλάξει η επιλογή, κάνε update στη βάση
+                if new_role_sel != r:
+                    st.session_state.users_db[uname]['role'] = new_role_sel
+                    st.toast(f"Ο ρόλος του {uname} άλλαξε σε {new_role_sel.upper()}!", icon="🔄")
+                    time.sleep(0.5)
+                    st.rerun()
+
+            # --- PASSWORD TOGGLE ---
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state: st.session_state[toggle_key] = False
             
             if st.session_state[toggle_key]:
                 c5.warning(f"`{udata['password']}`")
+                btn_icon = "🙈"
             else:
                 c5.text("••••••••")
+                btn_icon = "👁️"
                 
-            if c5.button("👁️", key=f"btn_{uname}"):
+            if c6.button(btn_icon, key=f"btn_{uname}"):
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
                 st.rerun()
             st.markdown("---")
