@@ -145,32 +145,39 @@ import pandas as pd # Βεβαιώσου ότι έχεις το import pandas σ
 st.divider()
 st.subheader("📊 Στατιστικά Καλλιεργειών")
 
-# Έλεγχος αν υπάρχουν δεδομένα
 if 'crops' in st.session_state and st.session_state.crops:
-    # Μετατροπή της λίστας σε DataFrame (Πίνακα) για εύκολη διαχείριση
     df = pd.DataFrame(st.session_state.crops)
-      # Δημιουργία στηλών για να μπουν τα γραφήματα δίπλα-δίπλα
+
+    # --- ΔΙΟΡΘΩΣΗ: Έλεγχος αν υπάρχουν οι στήλες ---
+    # Αν λείπει η στήλη 'quantity', τη φτιάχνουμε με μηδενικά
+    if 'quantity' not in df.columns:
+        df['quantity'] = 0
+    
+    # Αν λείπει η στήλη 'moisture', τη φτιάχνουμε με μηδενικά
+    if 'moisture' not in df.columns:
+        df['moisture'] = 0.0
+    # -----------------------------------------------
+
     col1, col2 = st.columns(2)
 
     with col1:
         st.caption("Ποσότητα (kg) ανά Καλλιέργεια")
-        # Μπαρο-διάγραμμα με τις ποσότητες
         st.bar_chart(df, x="name", y="quantity")
 
     with col2:
         st.caption("Επίπεδα Υγρασίας (%)")
-        # Γράφημα γραμμής για την υγρασία
         st.line_chart(df, x="name", y="moisture")
 
-    # Ένα γρήγορο "Σύνολο"
+    # Υπολογισμός συνόλου (με ασφάλεια)
     total_qty = df['quantity'].sum()
     st.metric(label="Συνολική Παραγωγή (kg)", value=f"{total_qty} kg")
 
+    # (Προαιρετικό) Για να δεις τι δεδομένα έχεις πραγματικά μέσα:
+    with st.expander("Προβολή Ακατέργαστων Δεδομένων (Debug)"):
+        st.dataframe(df)
+
 else:
     st.info("Πρόσθεσε μερικές καλλιέργειες για να δεις τα διαγράμματα!")
-import requests # Βεβαιώσου ότι είναι πάνω-πάνω στα imports
-import streamlit.components.v1 as components # Για να βάλουμε το EffiSpray
-
 st.divider()
 st.subheader("🌦️ Καιρικές Συνθήκες & Ψεκασμοί")
 
