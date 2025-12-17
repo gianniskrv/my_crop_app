@@ -3,10 +3,10 @@ import pandas as pd
 import requests
 import wikipedia
 import streamlit.components.v1 as components
-from datetime import datetime
+from datetime import date
 
 # --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
-st.set_page_config(page_title="AgroManager", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # --- 2. ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (GREEK CROPS) ---
 default_crops = [
@@ -23,131 +23,188 @@ default_crops = [
     {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera"},
 ]
 
-# --- 3. INITIALIZE SESSION STATE ---
-if 'my_crops' not in st.session_state:
-    st.session_state.my_crops = []
-
-if 'history' not in st.session_state:
-    st.session_state.history = []
+# --- 3. INITIALIZE SESSION STATE (Μνήμη) ---
+if 'history_log' not in st.session_state:
+    # Εδώ αποθηκεύουμε πλέον ΟΛΕΣ τις εγγραφές σαν ιστορικό
+    st.session_state.history_log = []
 
 # --- 4. ΠΛΕΥΡΙΚΟ ΜΕΝΟΥ ---
 st.sidebar.title("Μενού")
-menu_choice = st.sidebar.selectbox(
-    "Πλοήγηση", 
-    ["Διαχείριση & Εισαγωγή", "Προβολή & Στατιστικά", "🗄️ Βιβλιοθήκη Ιστορικού", "🌦️ Καιρός"]
-)
+menu_choice = st.sidebar.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Ιστορικό", "☁️ Καιρός & EffiSpray"])
 
 # --- 5. ΚΥΡΙΟ ΠΡΟΓΡΑΜΜΑ ---
 st.title("🌱 Agricultural Management System")
 
 # ==================================================
-# ΣΕΛΙΔΑ 1: ΔΙΑΧΕΙΡΙΣΗ & ΕΙΣΑΓΩΓΗ
+# ΣΕΛΙΔΑ 1: ΝΕΑ ΚΑΤΑΓΡΑΦΗ (ΕΙΣΑΓΩΓΗ)
 # ==================================================
-if menu_choice == "Διαχείριση & Εισαγωγή":
-    st.header("📝 Καταχώρηση Παραγωγής")
+if menu_choice == "📝 Νέα Καταγραφή":
+    st.header("Εισαγωγή Δεδομένων Παραγωγής")
     
-    # Επιλογή
+    # Επιλογή Καλλιέργειας
     crop_options = [c['name'] for c in default_crops] + ["➕ Προσθήκη Νέας..."]
     selected_option = st.selectbox("Επίλεξε Καλλιέργεια:", crop_options)
     
     current_name = ""
     current_category = ""
-    current_scientific = ""
     
+    # Λογική: Νέα ή Υπάρχουσα;
     if selected_option == "➕ Προσθήκη Νέας...":
-        st.info("Δημιουργία νέας καλλιέργειας.")
         col_new1, col_new2 = st.columns(2)
         current_name = col_new1.text_input("Όνομα Καλλιέργειας (π.χ. Καρυδιά)")
         current_category = col_new2.text_input("Κατηγορία (π.χ. Δέντρα)")
     else:
+        # Ανάκτηση στοιχείων από τη λίστα αναφοράς
         crop_data = next((item for item in default_crops if item["name"] == selected_option), None)
         if crop_data:
             current_name = crop_data['name']
             current_category = crop_data['category']
-            current_scientific = crop_data['scientific_name']
+            st.info(f"Κατηγορία: **{current_category}**")
             
-            col1, col2 = st.columns(2)
-            col1.text_input("Επιστημονικό Όνομα", current_scientific, disabled=True)
-            col2.text_input("Κατηγορία", current_category, disabled=True)
-
-            if st.checkbox("Εμφάνιση πληροφοριών Wikipedia"):
+            # Wikipedia Info (Προαιρετικό)
+            if st.checkbox("🔍 Πληροφορίες από Wikipedia"):
                 try:
-                    with st.spinner('Loading...'):
+                    with st.spinner('Αναζήτηση...'):
                         wikipedia.set_lang("el")
                         summary = wikipedia.summary(current_name, sentences=2)
-                        st.info(f"📚 {summary}")
+                        st.caption(f"📚 {summary}")
                 except:
                     st.warning("Δεν βρέθηκαν πληροφορίες.")
 
     st.divider()
     
-    if selected_option == "➕ Προσθήκη Νέας..." and not current_name:
-        st.warning("👈 Παρακαλώ συμπληρώστε το Όνομα της νέας καλλιέργειας.")
-    else:
-        with st.form("crop_form"):
-            existing = next((item for item in st.session_state.my_crops if item['name'] == current_name), None)
-            
-            def_qty = existing['quantity'] if existing else 0
-            def_moist = existing['moisture'] if existing else 0.0
-            def_var = existing['variety'] if existing and 'variety' in existing else ""
-
-            st.subheader("Στοιχεία Εγγραφής")
-            col_f1, col_f2 = st.columns(2)
-            new_qty = col_f1.number_input("Ποσότητα (kg)", min_value=0, value=def_qty, step=10)
-            new_moisture = col_f2.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, value=float(def_moist), step=0.1)
-            new_variety = st.text_input("Ποικιλία (π.χ. Κορωνέικη)", value=def_var)
-            
-            date_entry = st.date_input("Ημερομηνία Καταχώρησης", datetime.now())
-
-            submitted = st.form_submit_button("💾 Αποθήκευση στη Βιβλιοθήκη")
-            
-            if submitted:
-                # 1. Update Current State
-                if existing:
-                    existing['quantity'] = new_qty
-                    existing['moisture'] = new_moisture
-                    existing['variety'] = new_variety
-                    existing['category'] = current_category
-                else:
-                    new_entry = {
-                        "name": current_name,
-                        "category": current_category,
-                        "quantity": new_qty,
-                        "moisture": new_moisture,
-                        "variety": new_variety
-                    }
-                    st.session_state.my_crops.append(new_entry)
-                
-                # 2. Add to History
-                history_entry = {
-                    "date": date_entry,
-                    "year": date_entry.year,
+    # Φόρμα Καταγραφής με Ημερομηνία
+    with st.form("entry_form"):
+        st.subheader("Στοιχεία Εγγραφής")
+        
+        # Ημερομηνία & Ποικιλία
+        c1, c2 = st.columns(2)
+        # Default η σημερινή ημερομηνία
+        rec_date = c1.date_input("Ημερομηνία Καταγραφής", date.today())
+        rec_variety = c2.text_input("Ποικιλία", placeholder="π.χ. Κορωνέικη")
+        
+        # Ποσότητα & Υγρασία
+        c3, c4 = st.columns(2)
+        rec_qty = c3.number_input("Ποσότητα (kg)", min_value=0, step=10)
+        rec_moisture = c4.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, step=0.1)
+        
+        notes = st.text_area("Σημειώσεις / Παρατηρήσεις", placeholder="π.χ. Χαμηλή παραγωγή λόγω καύσωνα...")
+        
+        submitted = st.form_submit_button("💾 Αποθήκευση στη Βιβλιοθήκη")
+        
+        if submitted:
+            if not current_name:
+                st.error("Πρέπει να επιλέξεις ή να γράψεις όνομα καλλιέργειας!")
+            else:
+                new_entry = {
+                    "date": rec_date,
+                    "year": rec_date.year, # Αποθηκεύουμε το έτος ξεχωριστά για εύκολη αναζήτηση
                     "name": current_name,
-                    "variety": new_variety,
                     "category": current_category,
-                    "quantity": new_qty,
-                    "moisture": new_moisture
+                    "variety": rec_variety,
+                    "quantity": rec_qty,
+                    "moisture": rec_moisture,
+                    "notes": notes
                 }
-                st.session_state.history.append(history_entry)
-                
-                st.success(f"Η εγγραφή για '{current_name}' αποθηκεύτηκε!")
+                st.session_state.history_log.append(new_entry)
+                st.success(f"Η εγγραφή για '{current_name}' αποθηκεύτηκε επιτυχώς!")
 
 # ==================================================
-# ΣΕΛΙΔΑ 2: ΠΡΟΒΟΛΗ & ΣΤΑΤΙΣΤΙΚΑ
+# ΣΕΛΙΔΑ 2: ΒΙΒΛΙΟΘΗΚΗ & ΙΣΤΟΡΙΚΟ (ΤΑΞΙΝΟΜΗΣΗ)
 # ==================================================
-elif menu_choice == "Προβολή & Στατιστικά":
-    st.header("📊 Τρέχουσα Εικόνα Παραγωγής")
+elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
+    st.header("🗂️ Αρχείο Καλλιεργειών")
+
+    if not st.session_state.history_log:
+        st.info("Η βιβλιοθήκη είναι άδεια. Πήγαινε στο 'Νέα Καταγραφή' για να προσθέσεις δεδομένα.")
+    else:
+        # Μετατροπή σε DataFrame για εύκολη επεξεργασία
+        df = pd.DataFrame(st.session_state.history_log)
+        
+        # --- ΦΙΛΤΡΑ ---
+        with st.expander("🔍 Αναζήτηση & Φίλτρα", expanded=True):
+            col_f1, col_f2 = st.columns(2)
+            
+            # Φίλτρο Έτους
+            available_years = sorted(df['year'].unique(), reverse=True)
+            selected_year = col_f1.selectbox("Επίλεξε Έτος", available_years)
+            
+            # Φίλτρο Καλλιέργειας (με βάση το έτος)
+            df_year = df[df['year'] == selected_year]
+            available_crops = sorted(df_year['name'].unique())
+            selected_crops = col_f2.multiselect("Επίλεξε Καλλιέργειες (κενό για όλες)", available_crops)
+
+        st.divider()
+
+        # --- ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ ---
+        
+        # Τελικό Φιλτράρισμα
+        if selected_crops:
+            df_final = df_year[df_year['name'].isin(selected_crops)]
+        else:
+            df_final = df_year
+
+        if df_final.empty:
+            st.warning("Δεν βρέθηκαν εγγραφές με αυτά τα κριτήρια.")
+        else:
+            st.subheader(f"Αποτελέσματα για το {selected_year}")
+            
+            # 1. Συγκεντρωτικός Πίνακας (Pivot) - Πόσα κιλά ανά είδος συνολικά το έτος
+            st.write("📊 **Σύνολα Έτους ανά Είδος**")
+            summary = df_final.groupby(['name', 'category'])[['quantity']].sum().reset_index()
+            st.dataframe(summary, use_container_width=True)
+
+            # 2. Αναλυτικό Ιστορικό (Λίστα)
+            st.write("📝 **Αναλυτικές Εγγραφές**")
+            
+            # Ταξινόμηση ανά ημερομηνία
+            df_final = df_final.sort_values(by='date', ascending=False)
+            
+            for index, row in df_final.iterrows():
+                # Εμφάνιση καρτέλας για κάθε εγγραφή
+                with st.container():
+                    c_txt, c_vals = st.columns([3, 1])
+                    c_txt.markdown(f"**{row['name']}** ({row['category']}) - *{row['variety']}*")
+                    c_txt.caption(f"📅 {row['date']} | 📝 {row['notes']}")
+                    
+                    c_vals.metric("Ποσότητα", f"{row['quantity']} kg", f"Υγρ: {row['moisture']}%")
+                    st.markdown("---")
+
+
+# ==================================================
+# ΣΕΛΙΔΑ 3: ΚΑΙΡΟΣ & EFFISPRAY
+# ==================================================
+elif menu_choice == "☁️ Καιρός & EffiSpray":
     
-    if st.session_state.my_crops:
-        df = pd.DataFrame(st.session_state.my_crops)
+    st.header("🌦️ Καιρικές Συνθήκες")
+    user_location = st.text_input("📍 Περιοχή:", value="Larissa")
+    
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={user_location}&count=1&language=el&format=json"
+        geo_response = requests.get(geo_url).json()
         
-        total_kg = df['quantity'].sum()
-        avg_moist = df['moisture'].mean()
-        
-        col_m1, col_m2 = st.columns(2)
-        col_m1.metric("Συνολική Παραγωγή", f"{total_kg} kg")
-        col_m2.metric("Μέση Υγρασία", f"{avg_moist:.1f} %")
+        if "results" in geo_response:
+            loc_data = geo_response['results'][0]
+            lat, lon = loc_data['latitude'], loc_data['longitude']
+            
+            weather_url = (
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+                "&timezone=auto"
+            )
+            w_res = requests.get(weather_url).json()
+            curr = w_res['current']
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Θερμοκρασία", f"{curr['temperature_2m']}°C")
+            col2.metric("Υγρασία", f"{curr['relative_humidity_2m']}%")
+            col3.metric("Βροχή", f"{curr['precipitation']} mm")
+            col4.metric("Άνεμος", f"{curr['wind_speed_10m']} km/h")
+        else:
+            st.error("Η πόλη δεν βρέθηκε.")
+    except:
+        st.error("Σφάλμα σύνδεσης.")
 
-        tab1, tab2 = st.tabs(["Γράφημα Μπάρας", "Πίνακας"])
-        with tab1:
-            st.bar_chart(df, x="name", y="quantity")
+    st.divider()
+    st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
+    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
