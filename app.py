@@ -14,7 +14,7 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 🎨 UI & DESIGN (CSS STYLING)
+# 🎨 UI & DESIGN (CSS STYLING) - ΔΙΟΡΘΩΣΗ ΓΙΑ MOBILE MENU
 # ==============================================================================
 def local_css():
     st.markdown("""
@@ -42,9 +42,12 @@ def local_css():
             border-radius: 8px;
             border: 1px solid #a5d6a7;
         }
+        
+        /* ΔΙΟΡΘΩΣΗ: Δεν κρύβουμε πλέον το header για να φαίνεται το βελάκι στο κινητό */
+        /* header {visibility: hidden;} <--- ΑΥΤΟ ΔΙΑΓΡΑΦΗΚΕ */
+        
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;}
         .stDeployButton {display:none;}
     </style>
     """, unsafe_allow_html=True)
@@ -713,7 +716,6 @@ else:
         st.divider()
         st.subheader("📋 Λίστα Εγγεγραμμένων")
         
-        # --- HEADERS ---
         h1, h2, h3, h4, h5, h6 = st.columns([2, 2, 2, 2, 1, 1])
         h1.markdown("**Username**")
         h2.markdown("**Όνομα**")
@@ -723,19 +725,16 @@ else:
         h6.markdown("**Προβολή**")
         st.divider()
 
-        # --- LOOP USERS ---
         for uname, udata in st.session_state.users_db.items():
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 2, 1, 1])
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
             
-            # --- ROLE EDIT LOGIC ---
             r = udata['role']
-            if uname == "GiannisKrv": # OWNER - Δεν αλλάζει
+            if uname == "GiannisKrv": 
                 c4.error("OWNER (Locked)")
             else:
-                # Selectbox για αλλαγή ρόλου
                 current_index = 0 if r == 'user' else 1
                 new_role_sel = c4.selectbox(
                     "Change Role", 
@@ -745,14 +744,12 @@ else:
                     label_visibility="collapsed"
                 )
                 
-                # Αν αλλάξει η επιλογή, κάνε update στη βάση
                 if new_role_sel != r:
                     st.session_state.users_db[uname]['role'] = new_role_sel
                     st.toast(f"Ο ρόλος του {uname} άλλαξε σε {new_role_sel.upper()}!", icon="🔄")
                     time.sleep(0.5)
                     st.rerun()
 
-            # --- PASSWORD TOGGLE ---
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state: st.session_state[toggle_key] = False
             
