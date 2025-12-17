@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import wikipedia
 import streamlit.components.v1 as components
-from datetime import datetime # ΝΕΟ: Για να βάζουμε ημερομηνίες
+from datetime import datetime
 
 # --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager", page_icon="🌱", layout="wide")
@@ -24,11 +24,9 @@ default_crops = [
 ]
 
 # --- 3. INITIALIZE SESSION STATE ---
-# 'my_crops': Κρατάει την ΤΡΕΧΟΥΣΑ κατάσταση (για τα γραφήματα)
 if 'my_crops' not in st.session_state:
     st.session_state.my_crops = []
 
-# 'history': Κρατάει ΟΛΕΣ τις εγγραφές (Βιβλιοθήκη)
 if 'history' not in st.session_state:
     st.session_state.history = []
 
@@ -43,7 +41,7 @@ menu_choice = st.sidebar.selectbox(
 st.title("🌱 Agricultural Management System")
 
 # ==================================================
-# ΣΕΛΙΔΑ 1: ΔΙΑΧΕΙΡΙΣΗ (ADD/UPDATE)
+# ΣΕΛΙΔΑ 1: ΔΙΑΧΕΙΡΙΣΗ & ΕΙΣΑΓΩΓΗ
 # ==================================================
 if menu_choice == "Διαχείριση & Εισαγωγή":
     st.header("📝 Καταχώρηση Παραγωγής")
@@ -72,7 +70,6 @@ if menu_choice == "Διαχείριση & Εισαγωγή":
             col1.text_input("Επιστημονικό Όνομα", current_scientific, disabled=True)
             col2.text_input("Κατηγορία", current_category, disabled=True)
 
-            # Wikipedia check (μικρότερο κουμπί)
             if st.checkbox("Εμφάνιση πληροφοριών Wikipedia"):
                 try:
                     with st.spinner('Loading...'):
@@ -88,7 +85,6 @@ if menu_choice == "Διαχείριση & Εισαγωγή":
         st.warning("👈 Παρακαλώ συμπληρώστε το Όνομα της νέας καλλιέργειας.")
     else:
         with st.form("crop_form"):
-            # Βρες αν υπάρχει προηγούμενη εγγραφή για να γεμίσεις τα πεδία
             existing = next((item for item in st.session_state.my_crops if item['name'] == current_name), None)
             
             def_qty = existing['quantity'] if existing else 0
@@ -101,13 +97,12 @@ if menu_choice == "Διαχείριση & Εισαγωγή":
             new_moisture = col_f2.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, value=float(def_moist), step=0.1)
             new_variety = st.text_input("Ποικιλία (π.χ. Κορωνέικη)", value=def_var)
             
-            # Ημερομηνία Εγγραφής (Default: Σήμερα)
             date_entry = st.date_input("Ημερομηνία Καταχώρησης", datetime.now())
 
             submitted = st.form_submit_button("💾 Αποθήκευση στη Βιβλιοθήκη")
             
             if submitted:
-                # 1. Ενημέρωση Τρέχουσας Κατάστασης (Για τα γραφήματα)
+                # 1. Update Current State
                 if existing:
                     existing['quantity'] = new_qty
                     existing['moisture'] = new_moisture
@@ -123,11 +118,10 @@ if menu_choice == "Διαχείριση & Εισαγωγή":
                     }
                     st.session_state.my_crops.append(new_entry)
                 
-                # 2. Προσθήκη στο ΙΣΤΟΡΙΚΟ (Βιβλιοθήκη)
-                # Κάθε φορά που πατάς save, φτιάχνεται μια νέα εγγραφή "ιστορίας"
+                # 2. Add to History
                 history_entry = {
-                    "date": date_entry,          # Ημερομηνία
-                    "year": date_entry.year,     # Έτος (για εύκολο φιλτράρισμα)
+                    "date": date_entry,
+                    "year": date_entry.year,
                     "name": current_name,
                     "variety": new_variety,
                     "category": current_category,
@@ -136,10 +130,10 @@ if menu_choice == "Διαχείριση & Εισαγωγή":
                 }
                 st.session_state.history.append(history_entry)
                 
-                st.success(f"Η εγγραφή για '{current_name}' αποθηκεύτηκε στη Βιβλιοθήκη ({date_entry})!")
+                st.success(f"Η εγγραφή για '{current_name}' αποθηκεύτηκε!")
 
 # ==================================================
-# ΣΕΛΙΔΑ 2: ΠΡΟΒΟΛΗ & ΣΤΑΤΙΣΤΙΚΑ (DASHBOARD)
+# ΣΕΛΙΔΑ 2: ΠΡΟΒΟΛΗ & ΣΤΑΤΙΣΤΙΚΑ
 # ==================================================
 elif menu_choice == "Προβολή & Στατιστικά":
     st.header("📊 Τρέχουσα Εικόνα Παραγωγής")
@@ -147,80 +141,13 @@ elif menu_choice == "Προβολή & Στατιστικά":
     if st.session_state.my_crops:
         df = pd.DataFrame(st.session_state.my_crops)
         
-        # Κάρτες συνόλων
         total_kg = df['quantity'].sum()
         avg_moist = df['moisture'].mean()
+        
         col_m1, col_m2 = st.columns(2)
         col_m1.metric("Συνολική Παραγωγή", f"{total_kg} kg")
         col_m2.metric("Μέση Υγρασία", f"{avg_moist:.1f} %")
 
-        # Γραφήματα
         tab1, tab2 = st.tabs(["Γράφημα Μπάρας", "Πίνακας"])
         with tab1:
-            st.bar_chart(df, x="name", y="quantity")
-        with tab2:
-            st.dataframe(df, use_container_width=True)
-            
-    else:
-        st.info("Δεν υπάρχουν δεδομένα. Πήγαινε στην 'Διαχείριση' για να προσθέσεις.")
-
-# ==================================================
-# ΣΕΛΙΔΑ 3: ΒΙΒΛΙΟΘΗΚΗ ΙΣΤΟΡΙΚΟΥ (ΝΕΟ!)
-# ==================================================
-elif menu_choice == "🗄️ Βιβλιοθήκη Ιστορικού":
-    st.header("🗄️ Αρχείο Δεδομένων")
-    st.caption("Εδώ βλέπετε όλες τις καταχωρήσεις που έχετε κάνει διαχρονικά.")
-
-    if st.session_state.history:
-        # Δημιουργία DataFrame από το ιστορικό
-        df_hist = pd.DataFrame(st.session_state.history)
-        
-        # --- ΦΙΛΤΡΑ ---
-        col_filter1, col_filter2 = st.columns(2)
-        
-        # Φίλτρο Έτους
-        available_years = sorted(df_hist['year'].unique(), reverse=True)
-        selected_year = col_filter1.selectbox("📅 Επιλογή Έτους", available_years)
-        
-        # Φίλτρο Είδους (Καλλιέργειας)
-        available_crops = ["Όλα"] + sorted(df_hist['name'].unique().tolist())
-        selected_crop = col_filter2.selectbox("🌱 Επιλογή Καλλιέργειας", available_crops)
-        
-        # Εφαρμογή Φίλτρων
-        df_filtered = df_hist[df_hist['year'] == selected_year]
-        
-        if selected_crop != "Όλα":
-            df_filtered = df_filtered[df_filtered['name'] == selected_crop]
-            
-        # Εμφάνιση αποτελεσμάτων
-        st.divider()
-        st.subheader(f"Αποτελέσματα για: {selected_year}")
-        
-        if not df_filtered.empty:
-            # Μορφοποίηση ημερομηνίας για να φαίνεται ωραία
-            df_display = df_filtered.copy()
-            df_display['date'] = pd.to_datetime(df_display['date']).dt.strftime('%d/%m/%Y')
-            
-            # Επιλογή στηλών για εμφάνιση
-            cols_to_show = ['date', 'name', 'variety', 'quantity', 'moisture', 'category']
-            st.dataframe(df_display[cols_to_show], use_container_width=True)
-            
-            # Σύνολο φιλτραρισμένων
-            sum_filtered = df_filtered['quantity'].sum()
-            st.success(f"👉 Συνολική ποσότητα για την επιλογή σας: **{sum_filtered} kg**")
-        else:
-            st.warning("Δεν βρέθηκαν εγγραφές με αυτά τα κριτήρια.")
-            
-    else:
-        st.info("Η βιβλιοθήκη είναι άδεια. Ξεκινήστε τις καταχωρήσεις!")
-
-# ==================================================
-# ΣΕΛΙΔΑ 4: ΚΑΙΡΟΣ
-# ==================================================
-elif menu_choice == "🌦️ Καιρός":
-    st.header("🌦️ Καιρικές Συνθήκες")
-    
-    user_location = st.text_input("📍 Περιοχή:", value="Larissa")
-    
-    try:
-        geo_url = f"https://geocoding-api.open-
+            st.bar_chart(df, x="name", y
