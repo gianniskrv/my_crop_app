@@ -150,4 +150,4 @@ elif menu_choice == "Προβολή & Στατιστικά":
 
         tab1, tab2 = st.tabs(["Γράφημα Μπάρας", "Πίνακας"])
         with tab1:
-            st.bar_chart(df, x="name", y
+            st.bar_chart(df, x="name", y)
