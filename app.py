@@ -35,24 +35,24 @@ def send_email_notification(receiver_email, subject, body):
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
 
 # ==============================================================================
-# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ & ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ
+# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (FORCE ADMIN UPDATE)
 # ==============================================================================
 
+# Αρχικοποίηση βάσης χρηστών αν δεν υπάρχει
 if 'users_db' not in st.session_state:
     st.session_state.users_db = {
-        "GiannisKrv": {
-            "password": "21041414", 
-            "role": "admin", 
-            "name": "Γιάννης", 
-            "email": "johnkrv1@gmail.com" 
-        },
-        "user": {
-            "password": "123", 
-            "role": "user", 
-            "name": "Επισκέπτης", 
-            "email": "user@example.com"
-        }
+        "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
+
+# --- ΕΔΩ ΕΙΝΑΙ Η ΔΙΟΡΘΩΣΗ ---
+# Κάθε φορά που τρέχει η εφαρμογή, ΕΠΙΒΑΛΛΟΥΜΕ τα δικαιώματα Admin στον λογαριασμό σου
+# Έτσι δεν θα χαθεί ποτέ, ό,τι και να γίνει στη μνήμη του Streamlit.
+st.session_state.users_db["GiannisKrv"] = {
+    "password": "21041414", 
+    "role": "admin", 
+    "name": "Γιάννης", 
+    "email": "johnkrv1@gmail.com" 
+}
 
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
@@ -126,7 +126,13 @@ else:
     # 📱 ΚΥΡΙΑ ΕΦΑΡΜΟΓΗ
     # ==================================================
     with st.sidebar:
+        user_role = st.session_state.current_user['role']
         st.info(f"👤 **{st.session_state.current_user['name']}**")
+        
+        # Εμφάνιση Admin Badge
+        if user_role == 'admin':
+            st.warning("🔧 Admin Mode: Enabled")
+            
         if st.button("🚪 Αποσύνδεση"):
             logout()
         st.divider()
@@ -154,7 +160,7 @@ else:
     st.title("🌱 Agricultural Management System")
 
     # --------------------------------------------------
-    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ (ΜΕ ΟΙΚΟΝΟΜΙΚΑ)
+    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ
     # --------------------------------------------------
     if menu_choice == "📝 Νέα Καταγραφή":
         st.header("Εισαγωγή Παραγωγής & Οικονομικών")
@@ -197,14 +203,11 @@ else:
             st.markdown("---")
             st.write("💰 **Οικονομικά & Ποσότητες**")
             
-            # ΤΩΡΑ ΕΧΟΥΜΕ 3 ΣΤΗΛΕΣ
             c3, c4, c5 = st.columns(3)
             rec_qty = c3.number_input("Ποσότητα (kg)", min_value=0, step=10)
             rec_moisture = c4.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, step=0.1)
-            # ΝΕΟ ΠΕΔΙΟ ΤΙΜΗΣ
             rec_price = c5.number_input("Τιμή Πώλησης (€/kg)", min_value=0.0, step=0.01, format="%.2f")
             
-            # ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΟΥ
             total_revenue = rec_qty * rec_price
             if rec_qty > 0 and rec_price > 0:
                 st.info(f"💵 Εκτιμώμενο Έσοδο: **{total_revenue:.2f} €**")
@@ -225,14 +228,13 @@ else:
                         "variety": rec_variety,
                         "quantity": rec_qty,
                         "moisture": rec_moisture,
-                        "price": rec_price,       # Αποθήκευση Τιμής
-                        "revenue": total_revenue, # Αποθήκευση Συνόλου (€)
+                        "price": rec_price,
+                        "revenue": total_revenue,
                         "notes": notes
                     }
                     st.session_state.history_log.append(new_entry)
                     st.success(f"Αποθηκεύτηκε: {current_name} ({total_revenue:.2f}€)")
                     
-                    # Email Sender
                     user_mail = st.session_state.current_user.get('email')
                     if user_mail and "@" in user_mail:
                         email_subject = f"Νέα Πώληση: {current_name}"
@@ -248,7 +250,7 @@ else:
                         send_email_notification(user_mail, email_subject, email_body)
 
     # --------------------------------------------------
-    # 2. ΒΙΒΛΙΟΘΗΚΗ (ΜΕ ΟΙΚΟΝΟΜΙΚΑ ΣΥΝΟΛΑ)
+    # 2. ΒΙΒΛΙΟΘΗΚΗ
     # --------------------------------------------------
     elif menu_choice == "🗂️ Βιβλιοθήκη & Οικονομικά":
         st.header("🗂️ Αρχείο & Οικονομικά Στοιχεία")
@@ -276,7 +278,6 @@ else:
             else:
                 st.subheader(f"Οικονομικά Στοιχεία {sel_year}")
                 
-                # ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΙΚΩΝ ΕΣΟΔΩΝ
                 total_income_year = df_final['revenue'].sum()
                 total_kg_year = df_final['quantity'].sum()
                 
@@ -285,9 +286,7 @@ else:
                 m2.metric("⚖️ Συνολική Παραγωγή", f"{total_kg_year} kg")
                 
                 st.write("📊 **Ανάλυση ανά Προϊόν**")
-                # Ομαδοποίηση και εμφάνιση Κιλών ΚΑΙ Ευρώ
                 summary = df_final.groupby(['name'])[['quantity', 'revenue']].sum().reset_index()
-                # Μορφοποίηση πίνακα για να δείχνει τα € ωραία
                 st.dataframe(
                     summary.style.format({"revenue": "{:.2f} €"}), 
                     use_container_width=True
