@@ -140,7 +140,7 @@ new_moisture = st.number_input("Υγρασία (%)", min_value=0.0, format="%.2f
 
 if st.button("Save Crop"):
     st.success(f"Αποθηκεύτηκε: {selected_crop_name} - {new_qty}kg")
- import pandas as pd # Βεβαιώσου ότι έχεις το import pandas στην αρχή
+import pandas as pd # Βεβαιώσου ότι έχεις το import pandas στην αρχή
 
 st.divider()
 st.subheader("📊 Στατιστικά Καλλιεργειών")
@@ -168,8 +168,7 @@ if 'crops' in st.session_state and st.session_state.crops:
 
 else:
     st.info("Πρόσθεσε μερικές καλλιέργειες για να δεις τα διαγράμματα!")
-
- import requests # Βεβαιώσου ότι είναι πάνω-πάνω στα imports
+import requests # Βεβαιώσου ότι είναι πάνω-πάνω στα imports
 import streamlit.components.v1 as components # Για να βάλουμε το EffiSpray
 
 st.divider()
