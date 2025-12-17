@@ -21,10 +21,10 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER (Μόνο εσύ)
+# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
-    "role": "owner",  # <--- ΑΛΛΑΓΗ ΣΕ OWNER
+    "role": "owner", 
     "name": "Γιάννης", 
     "email": "johnkrv1@gmail.com" 
 }
@@ -34,9 +34,12 @@ if 'authenticated' not in st.session_state:
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΙΣΤΟΡΙΚΟΥ & ΜΗΝΥΜΑΤΩΝ ---
+# --- ΑΡΧΙΚΟΠΟΙΗΣΗ DB ---
 if 'history_log' not in st.session_state:
-    st.session_state.history_log = []
+    st.session_state.history_log = [] # ΕΣΟΔΑ (Παραγωγή)
+
+if 'expenses_log' not in st.session_state:
+    st.session_state.expenses_log = [] # ΕΞΟΔΑ (ΝΕΟ!)
 
 if 'support_messages' not in st.session_state:
     st.session_state.support_messages = []
@@ -53,10 +56,6 @@ hide_streamlit_style = """
             </style>
             """
 
-# ΛΟΓΙΚΗ: 
-# Αν δεν είναι συνδεδεμένος -> ΚΡΥΨΕ ΤΑ ΠΑΝΤΑ
-# Αν είναι συνδεδεμένος και ΔΕΝ είναι Owner -> ΚΡΥΨΕ ΤΑ ΠΑΝΤΑ
-# Μόνο ο OWNER βλέπει τα εργαλεία προγραμματιστή (Manage app)
 if not st.session_state.authenticated:
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 else:
@@ -98,7 +97,6 @@ def login_user(username, password):
     else:
         st.error("Ο χρήστης δεν βρέθηκε.")
 
-# Η δημόσια εγγραφή φτιάχνει πάντα 'user'
 def register_user(new_user, new_pass, new_name, new_email):
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
@@ -133,7 +131,7 @@ if not st.session_state.authenticated:
             login_user(username, password)
             
     with tab2:
-        st.write("Δημιουργήστε νέο λογαριασμό (Ρόλος: User):")
+        st.write("Δημιουργήστε νέο λογαριασμό:")
         c1, c2 = st.columns(2)
         new_user = c1.text_input("Επιθυμητό Username")
         new_pass = c2.text_input("Επιθυμητό Password", type="password")
@@ -157,17 +155,16 @@ else:
         
         # --- ΜΕΝΟΥ ---
         menu_options = [
-            "📝 Νέα Καταγραφή", 
+            "📝 Νέα Καταγραφή (Έσοδα)", # Μετονομάστηκε για σαφήνεια
+            "💸 Έξοδα & Ταμείο",          # <--- ΝΕΟ!
             "🗂️ Βιβλιοθήκη & Οικονομικά", 
             "☁️ Καιρός & EffiSpray",
             "🆘 Βοήθεια & Υποστήριξη"
         ]
         
-        # O OWNER και ο ADMIN βλέπουν τα μηνύματα
         if user_role in ['owner', 'admin']:
             menu_options.append("📨 Εισερχόμενα Μηνύματα")
         
-        # ΜΟΝΟ O OWNER βλέπει τη διαχείριση χρηστών (για να φτιάχνει Admins)
         if user_role == 'owner':
             st.warning("👑 Owner Mode")
             menu_options.append("👥 Διαχείριση Χρηστών")
@@ -180,7 +177,7 @@ else:
         st.title("Μενού")
         menu_choice = st.radio("Πλοήγηση", menu_options)
 
-    # --- DB ---
+    # --- DB CROPS ---
     default_crops = [
         {"name": "Βαμβάκι", "category": "Βιομηχανικά", "wiki_term": "Βαμβάκι (φυτό)"},
         {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "wiki_term": "Σίτος"},
@@ -198,10 +195,10 @@ else:
     st.title("🌱 Agricultural Management System")
 
     # --------------------------------------------------
-    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ
+    # 1. ΚΑΤΑΓΡΑΦΗ ΕΣΟΔΩΝ (ΠΑΡΑΓΩΓΗ)
     # --------------------------------------------------
-    if menu_choice == "📝 Νέα Καταγραφή":
-        st.header("Εισαγωγή Παραγωγής & Οικονομικών")
+    if menu_choice == "📝 Νέα Καταγραφή (Έσοδα)":
+        st.header("Εισαγωγή Παραγωγής & Πωλήσεων")
         
         crop_options = [c['name'] for c in default_crops] + ["➕ Προσθήκη Νέας..."]
         selected_option = st.selectbox("Επίλεξε Καλλιέργεια:", crop_options)
@@ -219,16 +216,6 @@ else:
                 current_name = crop_data['name']
                 current_category = crop_data['category']
                 st.info(f"Κατηγορία: **{current_category}**")
-                
-                if st.checkbox("🔍 Πληροφορίες από Wikipedia"):
-                    try:
-                        with st.spinner('Αναζήτηση...'):
-                            wikipedia.set_lang("el")
-                            search_term = crop_data.get('wiki_term', current_name)
-                            summary = wikipedia.summary(search_term, sentences=2)
-                            st.caption(f"📚 **{search_term}:** {summary}")
-                    except:
-                        st.warning(f"Δεν βρέθηκαν πληροφορίες.")
 
         st.divider()
         
@@ -236,11 +223,9 @@ else:
             st.subheader("Στοιχεία Εγγραφής")
             c1, c2 = st.columns(2)
             rec_date = c1.date_input("Ημερομηνία", date.today())
-            rec_variety = c2.text_input("Ποικιλία", placeholder="π.χ. Κορωνέικη")
+            rec_variety = c2.text_input("Ποικιλία")
             
-            st.markdown("---")
             st.write("💰 **Οικονομικά & Ποσότητες**")
-            
             c3, c4, c5 = st.columns(3)
             rec_qty = c3.number_input("Ποσότητα (kg)", min_value=0, step=10)
             rec_moisture = c4.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, step=0.1)
@@ -248,10 +233,10 @@ else:
             
             total_revenue = rec_qty * rec_price
             if rec_qty > 0 and rec_price > 0:
-                st.info(f"💵 Εκτιμώμενο Έσοδο: **{total_revenue:.2f} €**")
+                st.info(f"💵 Έσοδο: **{total_revenue:.2f} €**")
 
-            notes = st.text_area("Σημειώσεις", placeholder="Παρατηρήσεις...")
-            submitted = st.form_submit_button("💾 Αποθήκευση")
+            notes = st.text_area("Σημειώσεις")
+            submitted = st.form_submit_button("💾 Αποθήκευση Εσόδου")
             
             if submitted:
                 if not current_name:
@@ -261,6 +246,7 @@ else:
                         "user": st.session_state.current_user['name'],
                         "date": rec_date,
                         "year": rec_date.year,
+                        "type": "income", # Τύπος Εγγραφής
                         "name": current_name,
                         "category": current_category,
                         "variety": rec_variety,
@@ -271,81 +257,126 @@ else:
                         "notes": notes
                     }
                     st.session_state.history_log.append(new_entry)
-                    st.success(f"Αποθηκεύτηκε: {current_name} ({total_revenue:.2f}€)")
+                    st.success(f"Καταγράφηκε Έσοδο: {current_name} (+{total_revenue:.2f}€)")
                     
                     user_mail = st.session_state.current_user.get('email')
                     if user_mail and "@" in user_mail:
-                        email_subject = f"Νέα Πώληση: {current_name}"
-                        email_body = (
-                            f"Γεια σου {st.session_state.current_user['name']},\n\n"
-                            f"Καταχωρήθηκε νέα εγγραφή:\n"
-                            f"- Καλλιέργεια: {current_name}\n"
-                            f"- Ποσότητα: {rec_qty} kg\n"
-                            f"- Τιμή: {rec_price} €/kg\n"
-                            f"- ΣΥΝΟΛΟ ΕΣΟΔΩΝ: {total_revenue:.2f} €\n\n"
-                            f"Ημερομηνία: {rec_date}"
-                        )
-                        send_email_notification(user_mail, email_subject, email_body)
+                        send_email_notification(user_mail, f"Νέα Πώληση: {current_name}", f"Καταχωρήθηκε έσοδο {total_revenue}€.")
 
     # --------------------------------------------------
-    # 2. ΒΙΒΛΙΟΘΗΚΗ
+    # 2. ΚΑΤΑΓΡΑΦΗ ΕΞΟΔΩΝ (ΝΕΟ!)
+    # --------------------------------------------------
+    elif menu_choice == "💸 Έξοδα & Ταμείο":
+        st.header("💸 Διαχείριση Εξόδων")
+        
+        with st.form("expense_form"):
+            col1, col2 = st.columns(2)
+            exp_date = col1.date_input("Ημερομηνία Εξόδου", date.today())
+            exp_cat = col2.selectbox("Κατηγορία Εξόδου", [
+                "Λιπάσματα", "Φάρμακα", "Πετρέλαιο", "Σπόροι/Φυτά", 
+                "Εργατικά", "Ρεύμα/Νερό", "Μηχανήματα/Service", "Άλλα"
+            ])
+            
+            desc = st.text_input("Περιγραφή", placeholder="π.χ. Αγορά Ουρίας 10 σακιά")
+            
+            st.divider()
+            c1, c2, c3 = st.columns(3)
+            
+            amount_net = c1.number_input("Καθαρή Αξία (€)", min_value=0.0, step=1.0)
+            vat_rate = c2.selectbox("ΦΠΑ (%)", [0, 6, 13, 24], index=2) # Default 13%
+            
+            # Υπολογισμός ΦΠΑ
+            vat_amount = amount_net * (vat_rate / 100)
+            amount_total = amount_net + vat_amount
+            
+            c3.metric("Τελικό Ποσό (με ΦΠΑ)", f"{amount_total:.2f} €")
+            
+            submit_exp = st.form_submit_button("💾 Καταχώρηση Εξόδου")
+            
+            if submit_exp:
+                if amount_net > 0:
+                    expense_entry = {
+                        "user": st.session_state.current_user['name'],
+                        "date": exp_date,
+                        "year": exp_date.year,
+                        "type": "expense",
+                        "category": exp_cat,
+                        "description": desc,
+                        "amount_net": amount_net,
+                        "vat_rate": vat_rate,
+                        "vat_amount": vat_amount,
+                        "amount_total": amount_total
+                    }
+                    st.session_state.expenses_log.append(expense_entry)
+                    st.success(f"Καταχωρήθηκε έξοδο: -{amount_total:.2f} €")
+                else:
+                    st.warning("Παρακαλώ εισάγετε ποσό.")
+
+    # --------------------------------------------------
+    # 3. ΒΙΒΛΙΟΘΗΚΗ & ΟΙΚΟΝΟΜΙΚΑ (ΕΝΗΜΕΡΩΜΕΝΟ)
     # --------------------------------------------------
     elif menu_choice == "🗂️ Βιβλιοθήκη & Οικονομικά":
-        st.header("🗂️ Αρχείο & Οικονομικά Στοιχεία")
+        st.header("🗂️ Οικονομική Εικόνα & Αρχείο")
+        
+        # Merge lists just for visualization logic separation
+        df_income = pd.DataFrame(st.session_state.history_log)
+        df_expense = pd.DataFrame(st.session_state.expenses_log)
 
-        if not st.session_state.history_log:
-            st.info("Δεν υπάρχουν δεδομένα ακόμα.")
+        # ΦΙΛΤΡΑ
+        all_years = []
+        if not df_income.empty: all_years.extend(df_income['year'].unique())
+        if not df_expense.empty: all_years.extend(df_expense['year'].unique())
+        unique_years = sorted(list(set(all_years)), reverse=True)
+        
+        if not unique_years:
+            st.info("Δεν υπάρχουν εγγραφές ακόμα.")
         else:
-            df = pd.DataFrame(st.session_state.history_log)
-            
-            with st.expander("🔍 Αναζήτηση & Φίλτρα", expanded=True):
-                col_f1, col_f2 = st.columns(2)
-                years = sorted(df['year'].unique(), reverse=True)
-                sel_year = col_f1.selectbox("Έτος", years)
-                
-                df_year = df[df['year'] == sel_year]
-                crops = sorted(df_year['name'].unique())
-                sel_crops = col_f2.multiselect("Καλλιέργειες", crops)
-
+            sel_year = st.selectbox("Επιλέξτε Έτος Οικονομικών", unique_years)
             st.divider()
             
-            df_final = df_year[df_year['name'].isin(sel_crops)] if sel_crops else df_year
+            # Υπολογισμοί για το επιλεγμένο έτος
+            inc_year = pd.DataFrame()
+            exp_year = pd.DataFrame()
+            
+            if not df_income.empty: 
+                inc_year = df_income[df_income['year'] == sel_year]
+            if not df_expense.empty: 
+                exp_year = df_expense[df_expense['year'] == sel_year]
 
-            if df_final.empty:
-                st.warning("Κανένα αποτέλεσμα.")
-            else:
-                st.subheader(f"Οικονομικά Στοιχεία {sel_year}")
-                
-                total_income_year = df_final['revenue'].sum()
-                total_kg_year = df_final['quantity'].sum()
-                
-                m1, m2 = st.columns(2)
-                m1.metric("💰 Συνολικά Έσοδα Έτους", f"{total_income_year:.2f} €")
-                m2.metric("⚖️ Συνολική Παραγωγή", f"{total_kg_year} kg")
-                
-                st.write("📊 **Ανάλυση ανά Προϊόν**")
-                summary = df_final.groupby(['name'])[['quantity', 'revenue']].sum().reset_index()
-                st.dataframe(
-                    summary.style.format({"revenue": "{:.2f} €"}), 
-                    use_container_width=True
-                )
-
-                st.divider()
-                st.write("📝 **Αναλυτικό Ιστορικό**")
-                for i, row in df_final.sort_values(by='date', ascending=False).iterrows():
-                    with st.container():
-                        rev = row.get('revenue', 0)
-                        prc = row.get('price', 0)
-                        
-                        c_txt, c_money = st.columns([3, 1])
-                        c_txt.markdown(f"**{row['name']}** - {row['variety']} ({row['date']})")
-                        c_txt.caption(f"Ποσότητα: {row['quantity']}kg | Τιμή: {prc} €/kg")
-                        
-                        c_money.metric("Έσοδο", f"{rev:.2f} €")
-                        st.markdown("---")
+            total_rev = inc_year['revenue'].sum() if not inc_year.empty else 0.0
+            total_exp = exp_year['amount_total'].sum() if not exp_year.empty else 0.0
+            net_profit = total_rev - total_exp
+            
+            # --- DASHBOARD ---
+            col1, col2, col3 = st.columns(3)
+            col1.metric("💰 Έσοδα (Πωλήσεις)", f"{total_rev:.2f} €", delta_color="normal")
+            col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €", delta_color="inverse")
+            col3.metric("📉 ΚΑΘΑΡΟ ΚΕΡΔΟΣ", f"{net_profit:.2f} €", delta=f"{net_profit:.2f} €")
+            
+            st.markdown("---")
+            
+            tab_inc, tab_exp = st.tabs(["📈 Ανάλυση Εσόδων", "📉 Ανάλυση Εξόδων"])
+            
+            with tab_inc:
+                if inc_year.empty:
+                    st.info("Κανένα έσοδο για αυτό το έτος.")
+                else:
+                    st.dataframe(inc_year[['date', 'name', 'quantity', 'price', 'revenue']], use_container_width=True)
+            
+            with tab_exp:
+                if exp_year.empty:
+                    st.info("Κανένα έξοδο για αυτό το έτος.")
+                else:
+                    # Group by Category
+                    st.write("**Έξοδα ανά Κατηγορία**")
+                    exp_summary = exp_year.groupby('category')[['amount_net', 'vat_amount', 'amount_total']].sum().reset_index()
+                    st.dataframe(exp_summary, use_container_width=True)
+                    
+                    st.write("**Αναλυτική Λίστα**")
+                    st.dataframe(exp_year[['date', 'category', 'description', 'amount_total']], use_container_width=True)
 
     # --------------------------------------------------
-    # 3. ΚΑΙΡΟΣ
+    # 4. ΚΑΙΡΟΣ
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & EffiSpray":
         st.header("🌦️ Πρόγνωση Καιρού")
@@ -389,7 +420,7 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 4. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ
+    # 5. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ
     # --------------------------------------------------
     elif menu_choice == "🆘 Βοήθεια & Υποστήριξη":
         st.header("🆘 Κέντρο Υποστήριξης")
@@ -431,10 +462,9 @@ else:
                     st.error("⚠️ Παρακαλώ συμπληρώστε όλα τα πεδία.")
 
     # --------------------------------------------------
-    # 5. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (OWNER & ADMIN)
+    # 6. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (OWNER & ADMIN)
     # --------------------------------------------------
     elif menu_choice == "📨 Εισερχόμενα Μηνύματα":
-         # Έλεγχος: Μόνο Owner και Admin μπαίνουν εδώ
          if st.session_state.current_user['role'] not in ['owner', 'admin']:
              st.stop()
              
@@ -460,48 +490,35 @@ else:
              )
 
     # --------------------------------------------------
-    # 6. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (OWNER ONLY)
+    # 7. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (OWNER ONLY)
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
-        # ⚠️ ΑΠΟΚΛΕΙΣΤΙΚΑ ΓΙΑ OWNER ⚠️
         if st.session_state.current_user['role'] != 'owner':
-             st.error("⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ Η ΠΡΟΣΒΑΣΗ. Μόνο ο Ιδιοκτήτης έχει πρόσβαση εδώ.")
+             st.error("⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ Η ΠΡΟΣΒΑΣΗ.")
              st.stop()
         
         st.header("👑 Πίνακας Ελέγχου Owner")
-        st.caption("Εδώ μπορείτε να δημιουργήσετε νέους χρήστες και να ορίσετε αν θα είναι Admin ή User.")
         
-        # --- ΦΟΡΜΑ ΔΗΜΙΟΥΡΓΙΑΣ ΝΕΟΥ ΧΡΗΣΤΗ (ΜΕ ΕΠΙΛΟΓΗ ΡΟΛΟΥ) ---
-        with st.expander("➕ Προσθήκη Νέου Χρήστη (Admin/User)", expanded=True):
+        with st.expander("➕ Προσθήκη Νέου Χρήστη", expanded=True):
             with st.form("create_user_admin_form"):
                 c1, c2 = st.columns(2)
                 new_u = c1.text_input("Username")
                 new_p = c2.text_input("Password")
-                
                 c3, c4 = st.columns(2)
                 new_n = c3.text_input("Όνομα")
                 new_e = c4.text_input("Email")
-                
-                # ΕΠΙΛΟΓΗ ΡΟΛΟΥ
                 new_role = st.selectbox("Ρόλος", ["user", "admin"])
                 
-                submit_create = st.form_submit_button("Δημιουργία Χρήστη")
-                
-                if submit_create:
+                if st.form_submit_button("Δημιουργία"):
                     if new_u and new_p and new_n:
-                        if new_u in st.session_state.users_db:
-                            st.warning("Το Username υπάρχει ήδη.")
-                        else:
-                            st.session_state.users_db[new_u] = {
-                                "password": new_p,
-                                "role": new_role, # Αποθηκεύουμε τον ρόλο που διάλεξες
-                                "name": new_n,
-                                "email": new_e
-                            }
-                            st.success(f"Ο χρήστης {new_u} δημιουργήθηκε ως {new_role.upper()}!")
-                            st.rerun()
-                    else:
-                        st.warning("Συμπληρώστε τα βασικά πεδία.")
+                        st.session_state.users_db[new_u] = {
+                            "password": new_p,
+                            "role": new_role,
+                            "name": new_n,
+                            "email": new_e
+                        }
+                        st.success("Δημιουργήθηκε!")
+                        st.rerun()
 
         st.divider()
         st.subheader("📋 Λίστα Εγγεγραμμένων")
@@ -510,30 +527,23 @@ else:
         h1.markdown("**Username**")
         h2.markdown("**Όνομα**")
         h3.markdown("**Email**")
-        h4.markdown("**Ρόλος**") # Νέα στήλη για να βλέπεις ποιος είναι τι
+        h4.markdown("**Ρόλος**")
         h5.markdown("**Κωδικός**")
         h6.markdown("**Προβολή**")
         st.divider()
 
         for uname, udata in st.session_state.users_db.items():
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 1, 2, 1])
-            
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
-            
-            # Εμφάνιση Ρόλου με χρώμα
             r = udata['role']
-            if r == 'owner':
-                c4.error("OWNER")
-            elif r == 'admin':
-                c4.warning("ADMIN")
-            else:
-                c4.success("USER")
+            if r == 'owner': c4.error("OWNER")
+            elif r == 'admin': c4.warning("ADMIN")
+            else: c4.success("USER")
             
             toggle_key = f"vis_{uname}"
-            if toggle_key not in st.session_state:
-                st.session_state[toggle_key] = False
+            if toggle_key not in st.session_state: st.session_state[toggle_key] = False
             
             if st.session_state[toggle_key]:
                 c5.warning(f"`{udata['password']}`")
@@ -545,5 +555,4 @@ else:
             if c6.button(btn_icon, key=f"btn_{uname}"):
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
                 st.rerun()
-                
             st.markdown("---")
