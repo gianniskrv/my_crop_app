@@ -21,7 +21,7 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER
+# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER (ΓΙΑ ΕΣΕΝΑ)
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "owner", 
@@ -37,12 +37,10 @@ if 'current_user' not in st.session_state:
 # --- ΑΡΧΙΚΟΠΟΙΗΣΗ DB ---
 if 'history_log' not in st.session_state:
     st.session_state.history_log = [] # ΕΣΟΔΑ
-
 if 'expenses_log' not in st.session_state:
     st.session_state.expenses_log = [] # ΕΞΟΔΑ
-
 if 'support_messages' not in st.session_state:
-    st.session_state.support_messages = []
+    st.session_state.support_messages = [] # ΜΗΝΥΜΑΤΑ
 
 # ==============================================================================
 # 🎨 ΑΣΦΑΛΕΙΑ & ΑΠΟΚΡΥΨΗ MENU
@@ -85,7 +83,6 @@ def send_email_notification(receiver_email, subject, body):
 
 # --- HELPER: CONVERT DF TO CSV ---
 def convert_df(df):
-    # Μετατροπή DataFrame σε CSV για download (με utf-8-sig για ελληνικά στο Excel)
     return df.to_csv(index=False).encode('utf-8-sig')
 
 # --- LOGIN FUNCTIONS ---
@@ -162,7 +159,7 @@ else:
             "📝 Νέα Καταγραφή (Έσοδα)", 
             "💸 Έξοδα & Ταμείο",          
             "🗂️ Βιβλιοθήκη & Οικονομικά", 
-            "☁️ Καιρός & EffiSpray",
+            "☁️ Καιρός & Γεωργία Ακριβείας", 
             "🆘 Βοήθεια & Υποστήριξη"
         ]
         
@@ -316,7 +313,7 @@ else:
                     st.warning("Παρακαλώ εισάγετε ποσό.")
 
     # --------------------------------------------------
-    # 3. ΒΙΒΛΙΟΘΗΚΗ & ΟΙΚΟΝΟΜΙΚΑ (ME EXPORT)
+    # 3. ΒΙΒΛΙΟΘΗΚΗ & ΟΙΚΟΝΟΜΙΚΑ
     # --------------------------------------------------
     elif menu_choice == "🗂️ Βιβλιοθήκη & Οικονομικά":
         st.header("🗂️ Οικονομική Εικόνα & Αρχείο")
@@ -347,7 +344,6 @@ else:
             total_exp = exp_year['amount_total'].sum() if not exp_year.empty else 0.0
             net_profit = total_rev - total_exp
             
-            # DASHBOARD
             col1, col2, col3 = st.columns(3)
             col1.metric("💰 Έσοδα", f"{total_rev:.2f} €")
             col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €")
@@ -355,7 +351,6 @@ else:
             
             st.markdown("---")
             
-            # --- TABS ANALYSIS & EXPORT ---
             tab_inc, tab_exp, tab_export = st.tabs(["📈 Ανάλυση Εσόδων", "📉 Ανάλυση Εξόδων", "📥 Εξαγωγή Δεδομένων"])
             
             with tab_inc:
@@ -372,42 +367,30 @@ else:
                     st.dataframe(exp_summary, use_container_width=True)
                     st.dataframe(exp_year[['date', 'category', 'description', 'amount_total']], use_container_width=True)
             
-            # --- ΝΕΟ: TAB EXPORT ---
             with tab_export:
                 st.subheader("📥 Λήψη Αρχείων για Excel")
-                st.write("Κατεβάστε τα δεδομένα σας για να τα στείλετε στον λογιστή ή να τα κρατήσετε στο αρχείο σας.")
+                st.write("Κατεβάστε τα δεδομένα σας για να τα στείλετε στον λογιστή.")
                 
                 c_ex1, c_ex2 = st.columns(2)
                 
-                # Button 1: Income
                 if not inc_year.empty:
                     csv_inc = convert_df(inc_year)
-                    c_ex1.download_button(
-                        label="📄 Κατέβασε τα Έσοδα (CSV)",
-                        data=csv_inc,
-                        file_name=f"esoda_{sel_year}.csv",
-                        mime='text/csv',
-                    )
+                    c_ex1.download_button("📄 Κατέβασε τα Έσοδα (CSV)", csv_inc, f"esoda_{sel_year}.csv", 'text/csv')
                 else:
-                    c_ex1.info("Δεν υπάρχουν έσοδα για λήψη.")
+                    c_ex1.info("Χωρίς έσοδα.")
 
-                # Button 2: Expenses
                 if not exp_year.empty:
                     csv_exp = convert_df(exp_year)
-                    c_ex2.download_button(
-                        label="📄 Κατέβασε τα Έξοδα (CSV)",
-                        data=csv_exp,
-                        file_name=f"exoda_{sel_year}.csv",
-                        mime='text/csv',
-                    )
+                    c_ex2.download_button("📄 Κατέβασε τα Έξοδα (CSV)", csv_exp, f"exoda_{sel_year}.csv", 'text/csv')
                 else:
-                    c_ex2.info("Δεν υπάρχουν έξοδα για λήψη.")
+                    c_ex2.info("Χωρίς έξοδα.")
 
     # --------------------------------------------------
-    # 4. ΚΑΙΡΟΣ
+    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ
     # --------------------------------------------------
-    elif menu_choice == "☁️ Καιρός & EffiSpray":
-        st.header("🌦️ Πρόγνωση Καιρού")
+    elif menu_choice == "☁️ Καιρός & Γεωργία Ακριβείας":
+        st.header("🌦️ Καιρός & Γεωργία Ακριβείας")
+        
         col_search, col_btn = st.columns([3, 1])
         user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής", value="Larissa")
         
@@ -421,15 +404,16 @@ else:
                     lat, lon = data['latitude'], data['longitude']
                     name, country = data['name'], data.get("country", "")
 
-                    st.success(f"📍 Βρέθηκε: **{name}, {country}**")
+                    st.success(f"📍 Περιοχή: **{name}, {country}**")
 
                     weather_url = (
                         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                         "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
-                        "&timezone=auto"
+                        "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
                     )
                     w_res = requests.get(weather_url).json()
                     curr = w_res['current']
+                    daily = w_res['daily']
 
                     c1, c2, c3, c4 = st.columns(4)
                     c1.metric("🌡️ Θερμοκρασία", f"{curr['temperature_2m']} °C")
@@ -437,6 +421,42 @@ else:
                     c3.metric("☔ Βροχή", f"{curr['precipitation']} mm")
                     c4.metric("💨 Άνεμος", f"{curr['wind_speed_10m']} km/h")
                     
+                    st.divider()
+                    
+                    # --- GDD CALCULATOR ---
+                    st.subheader("🧬 Υπολογιστής Ημεροβαθμών Ανάπτυξης (GDD)")
+                    st.caption("Επιστημονική εκτίμηση ανάπτυξης φυτού βάσει θερμοκρασίας (Precision Ag Logic).")
+                    
+                    with st.container(border=True):
+                        crop_gdd = st.selectbox("Επιλέξτε Καλλιέργεια για Ανάλυση:", 
+                                                ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα"])
+                        
+                        t_base = 10.0
+                        if crop_gdd == "Βαμβάκι": t_base = 15.6
+                        elif crop_gdd == "Καλαμπόκι": t_base = 10.0
+                        elif crop_gdd == "Σιτάρι": t_base = 0.0
+                        elif crop_gdd == "Τομάτα": t_base = 10.0
+                        
+                        t_max = daily['temperature_2m_max'][0]
+                        t_min = daily['temperature_2m_min'][0]
+                        
+                        t_avg = (t_max + t_min) / 2
+                        gdd = t_avg - t_base
+                        if gdd < 0: gdd = 0
+                        
+                        k1, k2, k3 = st.columns(3)
+                        k1.metric("Μέγιστη Θερμοκρασία", f"{t_max} °C")
+                        k2.metric("Ελάχιστη Θερμοκρασία", f"{t_min} °C")
+                        k3.metric("Βασική Θερμοκρασία (Tbase)", f"{t_base} °C")
+                        
+                        st.markdown(f"#### 🌡️ Ημεροβαθμοί (GDD) Σήμερα: **{gdd:.1f}**")
+                        
+                        if gdd > 0:
+                            st.success(f"✅ Το {crop_gdd} αναπτύσσεται κανονικά σήμερα.")
+                        else:
+                            st.warning(f"❄️ Οι θερμοκρασίες είναι πολύ χαμηλές για το {crop_gdd}. Η ανάπτυξη έχει σταματήσει.")
+
+                    st.markdown("---")
                     st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
                 else:
                     st.warning("Η πόλη δεν βρέθηκε.")
