@@ -185,7 +185,7 @@ try:
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m"
     response = requests.get(url)
     data = response.json()
-current = data['current_weather']
+current = data ['current_weather']
     
     # Εμφάνιση σε ωραία κουτάκια (Metrics)
     col1, col2, col3 = st.columns(3)
