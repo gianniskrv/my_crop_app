@@ -181,5 +181,25 @@ elif menu_choice == "☁️ Καιρός & EffiSpray":
             loc_data = geo_response['results'][0]
             lat, lon = loc_data['latitude'], loc_data['longitude']
             
-            weather_url = (
-                f
+
+weather_url = (
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+                "&timezone=auto"
+            )
+            w_res = requests.get(weather_url).json()
+            curr = w_res['current']
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Θερμοκρασία", f"{curr['temperature_2m']}°C")
+            col2.metric("Υγρασία", f"{curr['relative_humidity_2m']}%")
+            col3.metric("Βροχή", f"{curr['precipitation']} mm")
+            col4.metric("Άνεμος", f"{curr['wind_speed_10m']} km/h")
+        else:
+            st.error("Η πόλη δεν βρέθηκε.")
+    except:
+        st.error("Σφάλμα σύνδεσης.")
+
+    st.divider()
+    st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
+    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
