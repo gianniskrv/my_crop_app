@@ -21,10 +21,10 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ ADMIN
+# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER (Μόνο εσύ)
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
-    "role": "admin", 
+    "role": "owner",  # <--- ΑΛΛΑΓΗ ΣΕ OWNER
     "name": "Γιάννης", 
     "email": "johnkrv1@gmail.com" 
 }
@@ -53,10 +53,14 @@ hide_streamlit_style = """
             </style>
             """
 
+# ΛΟΓΙΚΗ: 
+# Αν δεν είναι συνδεδεμένος -> ΚΡΥΨΕ ΤΑ ΠΑΝΤΑ
+# Αν είναι συνδεδεμένος και ΔΕΝ είναι Owner -> ΚΡΥΨΕ ΤΑ ΠΑΝΤΑ
+# Μόνο ο OWNER βλέπει τα εργαλεία προγραμματιστή (Manage app)
 if not st.session_state.authenticated:
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 else:
-    if st.session_state.current_user['role'] != 'admin':
+    if st.session_state.current_user['role'] != 'owner':
         st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==============================================================================
@@ -94,6 +98,7 @@ def login_user(username, password):
     else:
         st.error("Ο χρήστης δεν βρέθηκε.")
 
+# Η δημόσια εγγραφή φτιάχνει πάντα 'user'
 def register_user(new_user, new_pass, new_name, new_email):
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
@@ -128,7 +133,7 @@ if not st.session_state.authenticated:
             login_user(username, password)
             
     with tab2:
-        st.write("Δημιουργήστε νέο λογαριασμό:")
+        st.write("Δημιουργήστε νέο λογαριασμό (Ρόλος: User):")
         c1, c2 = st.columns(2)
         new_user = c1.text_input("Επιθυμητό Username")
         new_pass = c2.text_input("Επιθυμητό Password", type="password")
@@ -148,7 +153,7 @@ else:
     # ==================================================
     with st.sidebar:
         user_role = st.session_state.current_user['role']
-        st.info(f"👤 **{st.session_state.current_user['name']}**")
+        st.info(f"👤 **{st.session_state.current_user['name']}**\nRole: {user_role.upper()}")
         
         # --- ΜΕΝΟΥ ---
         menu_options = [
@@ -158,10 +163,16 @@ else:
             "🆘 Βοήθεια & Υποστήριξη"
         ]
         
-        if user_role == 'admin':
-            st.warning("🔧 Admin Mode: Enabled")
+        # O OWNER και ο ADMIN βλέπουν τα μηνύματα
+        if user_role in ['owner', 'admin']:
             menu_options.append("📨 Εισερχόμενα Μηνύματα")
+        
+        # ΜΟΝΟ O OWNER βλέπει τη διαχείριση χρηστών (για να φτιάχνει Admins)
+        if user_role == 'owner':
+            st.warning("👑 Owner Mode")
             menu_options.append("👥 Διαχείριση Χρηστών")
+        elif user_role == 'admin':
+            st.info("🔧 Admin Mode")
             
         if st.button("🚪 Αποσύνδεση"):
             logout()
@@ -378,18 +389,15 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 5. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ (ΕΝΗΜΕΡΩΜΕΝΟ)
+    # 4. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ
     # --------------------------------------------------
     elif menu_choice == "🆘 Βοήθεια & Υποστήριξη":
         st.header("🆘 Κέντρο Υποστήριξης")
         st.write("Συμπληρώστε την παρακάτω φόρμα για να επικοινωνήσετε απευθείας με τον διαχειριστή.")
         
         with st.form("support_form"):
-            # --- ΝΕΟ ΥΠΟΧΡΕΩΤΙΚΟ ΠΕΔΙΟ EMAIL ---
-            # Προ-συμπληρώνει το email αν υπάρχει στον λογαριασμό, αλλά ο χρήστης μπορεί να το αλλάξει
             default_email = st.session_state.current_user.get('email', '')
             sender_email = st.text_input("Το Email σας (για να λάβετε απάντηση) *", value=default_email)
-            
             subject = st.text_input("Θέμα Μηνύματος *", placeholder="π.χ. Πρόβλημα με την εγγραφή...")
             msg_body = st.text_area("Το μήνυμά σας *", placeholder="Γράψτε εδώ λεπτομέρειες...")
             
@@ -397,39 +405,37 @@ else:
             
             if submit_support:
                 if subject and msg_body and sender_email:
-                    # Αποθήκευση
                     msg_entry = {
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "user": st.session_state.current_user['name'],
-                        "email": sender_email, # Κρατάμε το email που δήλωσε τώρα
+                        "email": sender_email,
                         "subject": subject,
                         "message": msg_body
                     }
                     st.session_state.support_messages.append(msg_entry)
                     
-                    # Αποστολή Email στον Admin
                     admin_email = "johnkrv1@gmail.com"
                     email_subj_formatted = f"🔔 AgroManager Support: {subject}"
                     email_body_formatted = (
-                        f"Νέο μήνυμα υποστήριξης από τον χρήστη: {st.session_state.current_user['name']}\n"
-                        f"Email Επικοινωνίας Χρήστη: {sender_email}\n\n" # ΕΔΩ ΤΟ ΒΛΕΠΕΙΣ ΞΕΚΑΘΑΡΑ
+                        f"Νέο μήνυμα υποστήριξης από: {st.session_state.current_user['name']}\n"
+                        f"Email Επικοινωνίας: {sender_email}\n\n"
                         f"Θέμα: {subject}\n"
                         f"------------------------------------------------\n"
                         f"{msg_body}\n"
                         f"------------------------------------------------\n"
-                        f"Μπορείτε να απαντήσετε απευθείας σε αυτό το email: {sender_email}"
                     )
                     send_email_notification(admin_email, email_subj_formatted, email_body_formatted)
                     
-                    st.success("Το μήνυμά σας εστάλη επιτυχώς! Ο διαχειριστής θα επικοινωνήσει μαζί σας.")
+                    st.success("Το μήνυμά σας εστάλη επιτυχώς!")
                 else:
-                    st.error("⚠️ Παρακαλώ συμπληρώστε όλα τα πεδία, συμπεριλαμβανομένου του Email.")
+                    st.error("⚠️ Παρακαλώ συμπληρώστε όλα τα πεδία.")
 
     # --------------------------------------------------
-    # 6. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (ADMIN ONLY)
+    # 5. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (OWNER & ADMIN)
     # --------------------------------------------------
     elif menu_choice == "📨 Εισερχόμενα Μηνύματα":
-         if st.session_state.current_user['role'] != 'admin':
+         # Έλεγχος: Μόνο Owner και Admin μπαίνουν εδώ
+         if st.session_state.current_user['role'] not in ['owner', 'admin']:
              st.stop()
              
          st.header("📨 Εισερχόμενα Μηνύματα Χρηστών")
@@ -454,42 +460,89 @@ else:
              )
 
     # --------------------------------------------------
-    # 7. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY)
+    # 6. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (OWNER ONLY)
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
-        if st.session_state.current_user['role'] != 'admin':
+        # ⚠️ ΑΠΟΚΛΕΙΣΤΙΚΑ ΓΙΑ OWNER ⚠️
+        if st.session_state.current_user['role'] != 'owner':
+             st.error("⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ Η ΠΡΟΣΒΑΣΗ. Μόνο ο Ιδιοκτήτης έχει πρόσβαση εδώ.")
              st.stop()
         
-        st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin)")
-        st.caption("Διαχείριση εγγεγραμμένων χρηστών.")
+        st.header("👑 Πίνακας Ελέγχου Owner")
+        st.caption("Εδώ μπορείτε να δημιουργήσετε νέους χρήστες και να ορίσετε αν θα είναι Admin ή User.")
         
-        h1, h2, h3, h4, h5 = st.columns([2, 2, 2, 2, 1])
+        # --- ΦΟΡΜΑ ΔΗΜΙΟΥΡΓΙΑΣ ΝΕΟΥ ΧΡΗΣΤΗ (ΜΕ ΕΠΙΛΟΓΗ ΡΟΛΟΥ) ---
+        with st.expander("➕ Προσθήκη Νέου Χρήστη (Admin/User)", expanded=True):
+            with st.form("create_user_admin_form"):
+                c1, c2 = st.columns(2)
+                new_u = c1.text_input("Username")
+                new_p = c2.text_input("Password")
+                
+                c3, c4 = st.columns(2)
+                new_n = c3.text_input("Όνομα")
+                new_e = c4.text_input("Email")
+                
+                # ΕΠΙΛΟΓΗ ΡΟΛΟΥ
+                new_role = st.selectbox("Ρόλος", ["user", "admin"])
+                
+                submit_create = st.form_submit_button("Δημιουργία Χρήστη")
+                
+                if submit_create:
+                    if new_u and new_p and new_n:
+                        if new_u in st.session_state.users_db:
+                            st.warning("Το Username υπάρχει ήδη.")
+                        else:
+                            st.session_state.users_db[new_u] = {
+                                "password": new_p,
+                                "role": new_role, # Αποθηκεύουμε τον ρόλο που διάλεξες
+                                "name": new_n,
+                                "email": new_e
+                            }
+                            st.success(f"Ο χρήστης {new_u} δημιουργήθηκε ως {new_role.upper()}!")
+                            st.rerun()
+                    else:
+                        st.warning("Συμπληρώστε τα βασικά πεδία.")
+
+        st.divider()
+        st.subheader("📋 Λίστα Εγγεγραμμένων")
+
+        h1, h2, h3, h4, h5, h6 = st.columns([2, 2, 2, 1, 2, 1])
         h1.markdown("**Username**")
         h2.markdown("**Όνομα**")
         h3.markdown("**Email**")
-        h4.markdown("**Κωδικός**")
-        h5.markdown("**Προβολή**")
+        h4.markdown("**Ρόλος**") # Νέα στήλη για να βλέπεις ποιος είναι τι
+        h5.markdown("**Κωδικός**")
+        h6.markdown("**Προβολή**")
         st.divider()
 
         for uname, udata in st.session_state.users_db.items():
-            c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1])
+            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 1, 2, 1])
             
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
+            
+            # Εμφάνιση Ρόλου με χρώμα
+            r = udata['role']
+            if r == 'owner':
+                c4.error("OWNER")
+            elif r == 'admin':
+                c4.warning("ADMIN")
+            else:
+                c4.success("USER")
             
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state:
                 st.session_state[toggle_key] = False
             
             if st.session_state[toggle_key]:
-                c4.warning(f"`{udata['password']}`")
+                c5.warning(f"`{udata['password']}`")
                 btn_icon = "🙈"
             else:
-                c4.text("••••••••")
+                c5.text("••••••••")
                 btn_icon = "👁️"
             
-            if c5.button(btn_icon, key=f"btn_{uname}"):
+            if c6.button(btn_icon, key=f"btn_{uname}"):
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
                 st.rerun()
                 
