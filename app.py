@@ -458,20 +458,19 @@ else:
 
                     st.divider()
                     
-                    # --- ΝΕΟ: VRT FERTILIZER CALCULATOR ---
+                    # --- VRT FERTILIZER CALCULATOR (ME CUSTOM) ---
                     st.subheader("🧪 Υπολογιστής Λίπανσης (VRT Logic)")
                     st.caption("Υπολογισμός απαιτήσεων θρέψης βάσει στόχου παραγωγής και τύπου καλλιέργειας.")
                     
                     with st.container(border=True):
-                        # 1. Select Crop for Nutrient Removal Rates (Units per 1000kg or similar standard)
-                        # Simplified removal rates (Approx N units per 1000kg yield)
+                        # 1. Crop Selection
                         crop_fert = st.selectbox("Επιλογή Καλλιέργειας:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
                         
                         # Removal Coefficients (N units per 100 kg yield)
                         removal_coeff = 0
-                        if crop_fert == "Βαμβάκι": removal_coeff = 4.5  # Approx 4-5 units N per 100kg
-                        elif crop_fert == "Καλαμπόκι": removal_coeff = 2.5 # Approx 2-3 units N per 100kg
-                        elif crop_fert == "Σιτάρι": removal_coeff = 3.0    # Approx 3 units N per 100kg
+                        if crop_fert == "Βαμβάκι": removal_coeff = 4.5
+                        elif crop_fert == "Καλαμπόκι": removal_coeff = 2.5
+                        elif crop_fert == "Σιτάρι": removal_coeff = 3.0
                         
                         # 2. Target Yield
                         target_yield = st.number_input("Στόχος Παραγωγής (kg/στρέμμα):", min_value=100, step=50, value=400)
@@ -479,25 +478,43 @@ else:
                         # 3. Calculate N Needs
                         n_needs = (target_yield / 100) * removal_coeff
                         
-                        # 4. Select Fertilizer
-                        fert_type = st.selectbox("Τύπος Λιπάσματος (Άζωτο):", 
-                                                 ["Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)"])
+                        # 4. Select Fertilizer (CUSTOM OPTION ADDED)
+                        fert_options = [
+                            "Ουρία (46-0-0)", 
+                            "Νιτρική Αμμωνία (34.5-0-0)", 
+                            "Θειική Αμμωνία (21-0-0)", 
+                            "NPK (20-20-20)",
+                            "✏️ Άλλο / Custom" # <--- ΝΕΑ ΕΠΙΛΟΓΗ
+                        ]
                         
-                        # 5. Extract N content
+                        fert_sel = st.selectbox("Τύπος Λιπάσματος (Άζωτο):", fert_options)
+                        
                         n_content = 0.0
-                        if "46" in fert_type: n_content = 0.46
-                        elif "34.5" in fert_type: n_content = 0.345
-                        elif "21" in fert_type: n_content = 0.21
-                        elif "20" in fert_type: n_content = 0.20
+                        final_fert_name = fert_sel
                         
-                        # 6. Calculate Kg Fertilizer per Stremma
-                        # Efficiency Factor (Standard 0.7 - 0.8)
-                        efficiency = 0.8
-                        fert_kg_per_stremma = (n_needs / n_content) / efficiency
+                        # Λογική: Αν διάλεξε Custom, του ζητάμε να γράψει
+                        if fert_sel == "✏️ Άλλο / Custom":
+                            col_cust1, col_cust2 = st.columns(2)
+                            final_fert_name = col_cust1.text_input("Όνομα Λιπάσματος", placeholder="π.χ. UTEC 46")
+                            n_percent = col_cust2.number_input("Περιεκτικότητα σε Άζωτο (N) %:", min_value=0.0, max_value=100.0, step=0.1)
+                            n_content = n_percent / 100.0 # Μετατροπή % σε δεκαδικό (π.χ. 46% -> 0.46)
+                        else:
+                            # Αυτόματη αναγνώριση από τα έτοιμα
+                            if "46" in fert_sel: n_content = 0.46
+                            elif "34.5" in fert_sel: n_content = 0.345
+                            elif "21" in fert_sel: n_content = 0.21
+                            elif "20" in fert_sel: n_content = 0.20
                         
-                        st.info(f"Για να πετύχετε **{target_yield} kg/στρέμμα** {crop_fert}, το φυτό χρειάζεται περίπου **{n_needs:.1f} μονάδες Αζώτου**.")
-                        st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg_per_stremma:.1f} kg/στρέμμα** {fert_type}")
-                        st.caption("*Ο υπολογισμός λαμβάνει υπόψη συντελεστή απόδοσης 80% (VRT Standard).")
+                        # 5. Calculation (Only if N > 0)
+                        if n_content > 0:
+                            efficiency = 0.8 # VRT Standard
+                            fert_kg_per_stremma = (n_needs / n_content) / efficiency
+                            
+                            st.info(f"Για στόχο **{target_yield} kg/στρ** {crop_fert}, το φυτό χρειάζεται **{n_needs:.1f} μονάδες Αζώτου**.")
+                            st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg_per_stremma:.1f} kg/στρέμμα** {final_fert_name}")
+                            st.caption("*Συντελεστής απόδοσης θρέψης: 80%.")
+                        elif fert_sel == "✏️ Άλλο / Custom":
+                            st.warning("Παρακαλώ εισάγετε την περιεκτικότητα αζώτου για να γίνει ο υπολογισμός.")
 
 
                     st.markdown("---")
