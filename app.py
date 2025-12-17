@@ -5,16 +5,54 @@ import wikipedia
 import streamlit.components.v1 as components
 from datetime import date
 import time
+import smtplib
+import ssl
+from email.message import EmailMessage
 
-# --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ (ΠΡΕΠΕΙ ΝΑ ΕΙΝΑΙ Η ΠΡΩΤΗ ΕΝΤΟΛΗ) ---
+# --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
-# --- 2. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (LOGIN SYSTEM) ---
+# ==============================================================================
+# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL (ΣΥΜΠΛΗΡΩΜΕΝΕΣ)
+# ==============================================================================
+EMAIL_SENDER = "johnkrv1@gmail.com"
+EMAIL_PASSWORD = "kcsq wuoi wnik xzko"  # Ο κωδικός εφαρμογής που έδωσες
+
+def send_email_notification(receiver_email, subject, body):
+    try:
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg['Subject'] = subject
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = receiver_email
+
+        context = ssl.create_default_context()
+        # Σύνδεση με Gmail Server
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
+            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        st.toast(f"✅ Εστάλη email επιβεβαίωσης στο {receiver_email}!", icon="📩")
+    except Exception as e:
+        st.error(f"Απέτυχε η αποστολή email. Error: {e}")
+
+# ==============================================================================
+# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ & ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ
+# ==============================================================================
+
 if 'users_db' not in st.session_state:
-    # Εδώ έχω βάλει τα στοιχεία που ζήτησες
     st.session_state.users_db = {
-        "GiannisKrv": {"password": "21041414", "role": "admin", "name": "Γιάννης"},
-        "user": {"password": "123", "role": "user", "name": "Επισκέπτης"}
+        "GiannisKrv": {
+            "password": "21041414", 
+            "role": "admin", 
+            "name": "Γιάννης", 
+            "email": "johnkrv1@gmail.com" # Το email σου για να λαμβάνεις τις ειδοποιήσεις
+        },
+        "user": {
+            "password": "123", 
+            "role": "user", 
+            "name": "Επισκέπτης", 
+            "email": "user@example.com"
+        }
     }
 
 if 'authenticated' not in st.session_state:
@@ -36,12 +74,21 @@ def login_user(username, password):
     else:
         st.error("Ο χρήστης δεν βρέθηκε.")
 
-def register_user(new_user, new_pass, new_name):
+def register_user(new_user, new_pass, new_name, new_email):
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
-        st.session_state.users_db[new_user] = {"password": new_pass, "role": "user", "name": new_name}
+        st.session_state.users_db[new_user] = {
+            "password": new_pass, 
+            "role": "user", 
+            "name": new_name,
+            "email": new_email 
+        }
         st.success("Ο λογαριασμός δημιουργήθηκε! Τώρα μπορείτε να συνδεθείτε.")
+        
+        # Καλωσόρισμα νέου χρήστη
+        body = f"Γεια σου {new_name},\n\nΚαλωσήρθες στο AgroManager Pro!\nΟ λογαριασμός σου ενεργοποιήθηκε επιτυχώς."
+        send_email_notification(new_email, "Καλωσήρισες στο AgroManager", body)
 
 def logout():
     st.session_state.authenticated = False
@@ -49,10 +96,9 @@ def logout():
     st.rerun()
 
 # ==================================================
-# ΕΛΕΓΧΟΣ: ΕΙΝΑΙ ΣΥΝΔΕΔΕΜΕΝΟΣ;
+# 🔐 ΟΘΟΝΗ ΕΙΣΟΔΟΥ / ΕΓΓΡΑΦΗΣ
 # ==================================================
 if not st.session_state.authenticated:
-    # --- ΟΘΟΝΗ ΕΙΣΟΔΟΥ / ΕΓΓΡΑΦΗΣ ---
     st.title("🔐 AgroManager Login")
     
     tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
@@ -64,24 +110,32 @@ if not st.session_state.authenticated:
             login_user(username, password)
             
     with tab2:
-        new_user = st.text_input("Επιθυμητό Username")
-        new_pass = st.text_input("Επιθυμητό Password", type="password")
-        new_name = st.text_input("Ονοματεπώνυμο")
+        st.write("Δημιουργήστε νέο λογαριασμό:")
+        col_r1, col_r2 = st.columns(2)
+        new_user = col_r1.text_input("Επιθυμητό Username")
+        new_pass = col_r2.text_input("Επιθυμητό Password", type="password")
+        
+        col_r3, col_r4 = st.columns(2)
+        new_name = col_r3.text_input("Ονοματεπώνυμο")
+        new_email = col_r4.text_input("Email (για ειδοποιήσεις)")
+        
         if st.button("Δημιουργία Λογαριασμού"):
-            if new_user and new_pass:
-                register_user(new_user, new_pass, new_name)
+            if new_user and new_pass and new_name and new_email:
+                register_user(new_user, new_pass, new_name, new_email)
             else:
-                st.warning("Συμπληρώστε όλα τα πεδία.")
+                st.warning("Παρακαλώ συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
-    # ΚΥΡΙΑ ΕΦΑΡΜΟΓΗ (ΜΟΝΟ ΓΙΑ ΣΥΝΔΕΔΕΜΕΝΟΥΣ)
+    # 📱 ΚΥΡΙΑ ΕΦΑΡΜΟΓΗ
     # ==================================================
     
-    # --- SIDEBAR ME USER INFO ---
     with st.sidebar:
         user_role = st.session_state.current_user['role']
-        st.info(f"👤 Χρήστης: **{st.session_state.current_user['name']}**")
+        user_email = st.session_state.current_user.get('email', '-')
+        
+        st.info(f"👤 **{st.session_state.current_user['name']}**\n📧 {user_email}")
+        
         if user_role == 'admin':
             st.warning("🔧 Admin Mode: Enabled")
         
@@ -92,7 +146,7 @@ else:
         st.title("Μενού")
         menu_choice = st.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Ιστορικό", "☁️ Καιρός & EffiSpray"])
 
-    # --- ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (GREEK CROPS) ---
+    # --- ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ ---
     default_crops = [
         {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum", "wiki_term": "Βαμβάκι (φυτό)"},
         {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum", "wiki_term": "Σίτος"},
@@ -107,14 +161,13 @@ else:
         {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera", "wiki_term": "Άμπελος"},
     ]
 
-    # --- INITIALIZE HISTORY ---
     if 'history_log' not in st.session_state:
         st.session_state.history_log = []
 
     st.title("🌱 Agricultural Management System")
 
     # --------------------------------------------------
-    # ΣΕΛΙΔΑ 1: ΝΕΑ ΚΑΤΑΓΡΑΦΗ
+    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ
     # --------------------------------------------------
     if menu_choice == "📝 Νέα Καταγραφή":
         st.header("Εισαγωγή Δεδομένων Παραγωγής")
@@ -159,7 +212,7 @@ else:
             rec_moisture = c4.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, step=0.1)
             
             notes = st.text_area("Σημειώσεις", placeholder="Παρατηρήσεις...")
-            submitted = st.form_submit_button("💾 Αποθήκευση")
+            submitted = st.form_submit_button("💾 Αποθήκευση & Ενημέρωση Email")
             
             if submitted:
                 if not current_name:
@@ -178,9 +231,23 @@ else:
                     }
                     st.session_state.history_log.append(new_entry)
                     st.success(f"Αποθηκεύτηκε: {current_name}")
+                    
+                    # Email Sender
+                    user_mail = st.session_state.current_user.get('email')
+                    if user_mail and "@" in user_mail:
+                        email_subject = f"Νέα Καταγραφή: {current_name}"
+                        email_body = (
+                            f"Γεια σου {st.session_state.current_user['name']},\n\n"
+                            f"Προστέθηκε μια νέα εγγραφή στο AgroManager:\n"
+                            f"- Καλλιέργεια: {current_name}\n"
+                            f"- Ποσότητα: {rec_qty} kg\n"
+                            f"- Ημερομηνία: {rec_date}\n\n"
+                            f"Ευχαριστούμε!"
+                        )
+                        send_email_notification(user_mail, email_subject, email_body)
 
     # --------------------------------------------------
-    # ΣΕΛΙΔΑ 2: ΒΙΒΛΙΟΘΗΚΗ
+    # 2. ΒΙΒΛΙΟΘΗΚΗ
     # --------------------------------------------------
     elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
         st.header("🗂️ Αρχείο Καλλιεργειών")
@@ -208,29 +275,26 @@ else:
             else:
                 st.subheader(f"Δεδομένα του {sel_year}")
                 
-                # Σύνολα
                 st.write("📊 **Σύνολα (kg)**")
                 summary = df_final.groupby(['name'])[['quantity']].sum().reset_index()
                 st.dataframe(summary, use_container_width=True)
 
-                # Λίστα
                 st.write("📝 **Ιστορικό Εγγραφών**")
                 for i, row in df_final.sort_values(by='date', ascending=False).iterrows():
                     with st.container():
                         st.markdown(f"**{row['name']}** - {row['variety']} ({row['date']})")
-                        st.caption(f"✍️ Καταχωρήθηκε από: {row.get('user', '-')}") 
-                        st.caption(f"Ποσότητα: {row['quantity']}kg | Υγρασία: {row['moisture']}% | {row['notes']}")
+                        st.caption(f"✍️ Από: {row.get('user', '-')} | Ποσότητα: {row['quantity']}kg | Υγρ: {row['moisture']}%")
                         st.markdown("---")
 
     # --------------------------------------------------
-    # ΣΕΛΙΔΑ 3: ΚΑΙΡΟΣ & TOOLS
+    # 3. ΚΑΙΡΟΣ & TOOLS
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & EffiSpray":
         
         st.header("🌦️ Πρόγνωση Καιρού")
         
         col_search, col_btn = st.columns([3, 1])
-        user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής (π.χ. Larissa, Karditsa, Athens)", value="Larissa")
+        user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής", value="Larissa")
         
         if user_city:
             try:
@@ -260,13 +324,10 @@ else:
                     c3.metric("☔ Βροχή", f"{curr['precipitation']} mm")
                     c4.metric("💨 Άνεμος", f"{curr['wind_speed_10m']} km/h")
                     
-                    map_data = pd.DataFrame({'lat': [lat], 'lon': [lon]})
-                    st.map(map_data)
-                    
+                    st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
                 else:
-                    st.warning("Η πόλη δεν βρέθηκε. Δοκίμασε με Λατινικούς χαρακτήρες.")
-
-            except Exception:
+                    st.warning("Η πόλη δεν βρέθηκε.")
+            except:
                 st.error("Υπήρξε πρόβλημα με τη σύνδεση.")
 
         st.divider()
