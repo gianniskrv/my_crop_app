@@ -9,23 +9,23 @@ from datetime import date
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # --- 2. ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (GREEK CROPS) ---
+# Προστέθηκε το 'wiki_term' για σωστή αναζήτηση στη Wikipedia
 default_crops = [
-    {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum"},
-    {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum"},
-    {"name": "Καλαμπόκι", "category": "Σιτηρά", "scientific_name": "Zea mays"},
-    {"name": "Ηλίανθος", "category": "Βιομηχανικά", "scientific_name": "Helianthus annuus"},
-    {"name": "Ελιά (Λαδοελιά)", "category": "Δέντρα", "scientific_name": "Olea europaea"},
-    {"name": "Ελιά (Βρώσιμη)", "category": "Δέντρα", "scientific_name": "Olea europaea"},
-    {"name": "Πορτοκαλιά", "category": "Εσπεριδοειδή", "scientific_name": "Citrus sinensis"},
-    {"name": "Ροδακινιά", "category": "Πυρηνόκαρπα", "scientific_name": "Prunus persica"},
-    {"name": "Τομάτα", "category": "Κηπευτικά", "scientific_name": "Solanum lycopersicum"},
-    {"name": "Πατάτα", "category": "Κηπευτικά", "scientific_name": "Solanum tuberosum"},
-    {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera"},
+    {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum", "wiki_term": "Βαμβάκι (φυτό)"},
+    {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum", "wiki_term": "Σίτος"},
+    {"name": "Καλαμπόκι", "category": "Σιτηρά", "scientific_name": "Zea mays", "wiki_term": "Αραβόσιτος"},
+    {"name": "Ηλίανθος", "category": "Βιομηχανικά", "scientific_name": "Helianthus annuus", "wiki_term": "Ηλίανθος"},
+    {"name": "Ελιά (Λαδοελιά)", "category": "Δέντρα", "scientific_name": "Olea europaea", "wiki_term": "Ελιά"},
+    {"name": "Ελιά (Βρώσιμη)", "category": "Δέντρα", "scientific_name": "Olea europaea", "wiki_term": "Ελιά"},
+    {"name": "Πορτοκαλιά", "category": "Εσπεριδοειδή", "scientific_name": "Citrus sinensis", "wiki_term": "Πορτοκαλιά"},
+    {"name": "Ροδακινιά", "category": "Πυρηνόκαρπα", "scientific_name": "Prunus persica", "wiki_term": "Ροδακινιά"},
+    {"name": "Τομάτα", "category": "Κηπευτικά", "scientific_name": "Solanum lycopersicum", "wiki_term": "Τομάτα"},
+    {"name": "Πατάτα", "category": "Κηπευτικά", "scientific_name": "Solanum tuberosum", "wiki_term": "Πατάτα"},
+    {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera", "wiki_term": "Άμπελος"},
 ]
 
 # --- 3. INITIALIZE SESSION STATE (Μνήμη) ---
 if 'history_log' not in st.session_state:
-    # Εδώ αποθηκεύουμε πλέον ΟΛΕΣ τις εγγραφές σαν ιστορικό
     st.session_state.history_log = []
 
 # --- 4. ΠΛΕΥΡΙΚΟ ΜΕΝΟΥ ---
@@ -61,15 +61,17 @@ if menu_choice == "📝 Νέα Καταγραφή":
             current_category = crop_data['category']
             st.info(f"Κατηγορία: **{current_category}**")
             
-            # Wikipedia Info (Προαιρετικό)
+            # Wikipedia Info (Διορθωμένο)
             if st.checkbox("🔍 Πληροφορίες από Wikipedia"):
                 try:
                     with st.spinner('Αναζήτηση...'):
                         wikipedia.set_lang("el")
-                        summary = wikipedia.summary(current_name, sentences=2)
-                        st.caption(f"📚 {summary}")
+                        # Χρήση του ειδικού όρου (wiki_term) αν υπάρχει, αλλιώς του ονόματος
+                        search_term = crop_data.get('wiki_term', current_name)
+                        summary = wikipedia.summary(search_term, sentences=2)
+                        st.caption(f"📚 **{search_term}:** {summary}")
                 except:
-                    st.warning("Δεν βρέθηκαν πληροφορίες.")
+                    st.warning(f"Δεν βρέθηκαν πληροφορίες για '{current_name}'.")
 
     st.divider()
     
@@ -79,7 +81,6 @@ if menu_choice == "📝 Νέα Καταγραφή":
         
         # Ημερομηνία & Ποικιλία
         c1, c2 = st.columns(2)
-        # Default η σημερινή ημερομηνία
         rec_date = c1.date_input("Ημερομηνία Καταγραφής", date.today())
         rec_variety = c2.text_input("Ποικιλία", placeholder="π.χ. Κορωνέικη")
         
@@ -98,7 +99,7 @@ if menu_choice == "📝 Νέα Καταγραφή":
             else:
                 new_entry = {
                     "date": rec_date,
-                    "year": rec_date.year, # Αποθηκεύουμε το έτος ξεχωριστά για εύκολη αναζήτηση
+                    "year": rec_date.year,
                     "name": current_name,
                     "category": current_category,
                     "variety": rec_variety,
@@ -118,7 +119,6 @@ elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
     if not st.session_state.history_log:
         st.info("Η βιβλιοθήκη είναι άδεια. Πήγαινε στο 'Νέα Καταγραφή' για να προσθέσεις δεδομένα.")
     else:
-        # Μετατροπή σε DataFrame για εύκολη επεξεργασία
         df = pd.DataFrame(st.session_state.history_log)
         
         # --- ΦΙΛΤΡΑ ---
@@ -137,8 +137,6 @@ elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
         st.divider()
 
         # --- ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ ---
-        
-        # Τελικό Φιλτράρισμα
         if selected_crops:
             df_final = df_year[df_year['name'].isin(selected_crops)]
         else:
@@ -149,19 +147,16 @@ elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
         else:
             st.subheader(f"Αποτελέσματα για το {selected_year}")
             
-            # 1. Συγκεντρωτικός Πίνακας (Pivot) - Πόσα κιλά ανά είδος συνολικά το έτος
+            # 1. Συγκεντρωτικός Πίνακας
             st.write("📊 **Σύνολα Έτους ανά Είδος**")
             summary = df_final.groupby(['name', 'category'])[['quantity']].sum().reset_index()
             st.dataframe(summary, use_container_width=True)
 
-            # 2. Αναλυτικό Ιστορικό (Λίστα)
+            # 2. Αναλυτικό Ιστορικό
             st.write("📝 **Αναλυτικές Εγγραφές**")
-            
-            # Ταξινόμηση ανά ημερομηνία
             df_final = df_final.sort_values(by='date', ascending=False)
             
             for index, row in df_final.iterrows():
-                # Εμφάνιση καρτέλας για κάθε εγγραφή
                 with st.container():
                     c_txt, c_vals = st.columns([3, 1])
                     c_txt.markdown(f"**{row['name']}** ({row['category']}) - *{row['variety']}*")
@@ -169,7 +164,6 @@ elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
                     
                     c_vals.metric("Ποσότητα", f"{row['quantity']} kg", f"Υγρ: {row['moisture']}%")
                     st.markdown("---")
-
 
 # ==================================================
 # ΣΕΛΙΔΑ 3: ΚΑΙΡΟΣ & EFFISPRAY
@@ -188,23 +182,4 @@ elif menu_choice == "☁️ Καιρός & EffiSpray":
             lat, lon = loc_data['latitude'], loc_data['longitude']
             
             weather_url = (
-                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-                "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
-                "&timezone=auto"
-            )
-            w_res = requests.get(weather_url).json()
-            curr = w_res['current']
-            
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Θερμοκρασία", f"{curr['temperature_2m']}°C")
-            col2.metric("Υγρασία", f"{curr['relative_humidity_2m']}%")
-            col3.metric("Βροχή", f"{curr['precipitation']} mm")
-            col4.metric("Άνεμος", f"{curr['wind_speed_10m']} km/h")
-        else:
-            st.error("Η πόλη δεν βρέθηκε.")
-    except:
-        st.error("Σφάλμα σύνδεσης.")
-
-    st.divider()
-    st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
-    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
+                f
