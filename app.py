@@ -36,10 +36,10 @@ if 'current_user' not in st.session_state:
 
 # --- ΑΡΧΙΚΟΠΟΙΗΣΗ DB ---
 if 'history_log' not in st.session_state:
-    st.session_state.history_log = [] # ΕΣΟΔΑ (Παραγωγή)
+    st.session_state.history_log = [] # ΕΣΟΔΑ
 
 if 'expenses_log' not in st.session_state:
-    st.session_state.expenses_log = [] # ΕΞΟΔΑ (ΝΕΟ!)
+    st.session_state.expenses_log = [] # ΕΞΟΔΑ
 
 if 'support_messages' not in st.session_state:
     st.session_state.support_messages = []
@@ -82,6 +82,11 @@ def send_email_notification(receiver_email, subject, body):
             smtp.send_message(msg)
     except Exception as e:
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
+
+# --- HELPER: CONVERT DF TO CSV ---
+def convert_df(df):
+    # Μετατροπή DataFrame σε CSV για download (με utf-8-sig για ελληνικά στο Excel)
+    return df.to_csv(index=False).encode('utf-8-sig')
 
 # --- LOGIN FUNCTIONS ---
 def login_user(username, password):
@@ -153,10 +158,9 @@ else:
         user_role = st.session_state.current_user['role']
         st.info(f"👤 **{st.session_state.current_user['name']}**\nRole: {user_role.upper()}")
         
-        # --- ΜΕΝΟΥ ---
         menu_options = [
-            "📝 Νέα Καταγραφή (Έσοδα)", # Μετονομάστηκε για σαφήνεια
-            "💸 Έξοδα & Ταμείο",          # <--- ΝΕΟ!
+            "📝 Νέα Καταγραφή (Έσοδα)", 
+            "💸 Έξοδα & Ταμείο",          
             "🗂️ Βιβλιοθήκη & Οικονομικά", 
             "☁️ Καιρός & EffiSpray",
             "🆘 Βοήθεια & Υποστήριξη"
@@ -195,7 +199,7 @@ else:
     st.title("🌱 Agricultural Management System")
 
     # --------------------------------------------------
-    # 1. ΚΑΤΑΓΡΑΦΗ ΕΣΟΔΩΝ (ΠΑΡΑΓΩΓΗ)
+    # 1. ΚΑΤΑΓΡΑΦΗ ΕΣΟΔΩΝ
     # --------------------------------------------------
     if menu_choice == "📝 Νέα Καταγραφή (Έσοδα)":
         st.header("Εισαγωγή Παραγωγής & Πωλήσεων")
@@ -246,7 +250,7 @@ else:
                         "user": st.session_state.current_user['name'],
                         "date": rec_date,
                         "year": rec_date.year,
-                        "type": "income", # Τύπος Εγγραφής
+                        "type": "income",
                         "name": current_name,
                         "category": current_category,
                         "variety": rec_variety,
@@ -264,7 +268,7 @@ else:
                         send_email_notification(user_mail, f"Νέα Πώληση: {current_name}", f"Καταχωρήθηκε έσοδο {total_revenue}€.")
 
     # --------------------------------------------------
-    # 2. ΚΑΤΑΓΡΑΦΗ ΕΞΟΔΩΝ (ΝΕΟ!)
+    # 2. ΚΑΤΑΓΡΑΦΗ ΕΞΟΔΩΝ
     # --------------------------------------------------
     elif menu_choice == "💸 Έξοδα & Ταμείο":
         st.header("💸 Διαχείριση Εξόδων")
@@ -283,9 +287,8 @@ else:
             c1, c2, c3 = st.columns(3)
             
             amount_net = c1.number_input("Καθαρή Αξία (€)", min_value=0.0, step=1.0)
-            vat_rate = c2.selectbox("ΦΠΑ (%)", [0, 6, 13, 24], index=2) # Default 13%
+            vat_rate = c2.selectbox("ΦΠΑ (%)", [0, 6, 13, 24], index=2)
             
-            # Υπολογισμός ΦΠΑ
             vat_amount = amount_net * (vat_rate / 100)
             amount_total = amount_net + vat_amount
             
@@ -313,16 +316,14 @@ else:
                     st.warning("Παρακαλώ εισάγετε ποσό.")
 
     # --------------------------------------------------
-    # 3. ΒΙΒΛΙΟΘΗΚΗ & ΟΙΚΟΝΟΜΙΚΑ (ΕΝΗΜΕΡΩΜΕΝΟ)
+    # 3. ΒΙΒΛΙΟΘΗΚΗ & ΟΙΚΟΝΟΜΙΚΑ (ME EXPORT)
     # --------------------------------------------------
     elif menu_choice == "🗂️ Βιβλιοθήκη & Οικονομικά":
         st.header("🗂️ Οικονομική Εικόνα & Αρχείο")
         
-        # Merge lists just for visualization logic separation
         df_income = pd.DataFrame(st.session_state.history_log)
         df_expense = pd.DataFrame(st.session_state.expenses_log)
 
-        # ΦΙΛΤΡΑ
         all_years = []
         if not df_income.empty: all_years.extend(df_income['year'].unique())
         if not df_expense.empty: all_years.extend(df_expense['year'].unique())
@@ -334,7 +335,6 @@ else:
             sel_year = st.selectbox("Επιλέξτε Έτος Οικονομικών", unique_years)
             st.divider()
             
-            # Υπολογισμοί για το επιλεγμένο έτος
             inc_year = pd.DataFrame()
             exp_year = pd.DataFrame()
             
@@ -347,33 +347,61 @@ else:
             total_exp = exp_year['amount_total'].sum() if not exp_year.empty else 0.0
             net_profit = total_rev - total_exp
             
-            # --- DASHBOARD ---
+            # DASHBOARD
             col1, col2, col3 = st.columns(3)
-            col1.metric("💰 Έσοδα (Πωλήσεις)", f"{total_rev:.2f} €", delta_color="normal")
-            col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €", delta_color="inverse")
+            col1.metric("💰 Έσοδα", f"{total_rev:.2f} €")
+            col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €")
             col3.metric("📉 ΚΑΘΑΡΟ ΚΕΡΔΟΣ", f"{net_profit:.2f} €", delta=f"{net_profit:.2f} €")
             
             st.markdown("---")
             
-            tab_inc, tab_exp = st.tabs(["📈 Ανάλυση Εσόδων", "📉 Ανάλυση Εξόδων"])
+            # --- TABS ANALYSIS & EXPORT ---
+            tab_inc, tab_exp, tab_export = st.tabs(["📈 Ανάλυση Εσόδων", "📉 Ανάλυση Εξόδων", "📥 Εξαγωγή Δεδομένων"])
             
             with tab_inc:
                 if inc_year.empty:
-                    st.info("Κανένα έσοδο για αυτό το έτος.")
+                    st.info("Κανένα έσοδο.")
                 else:
                     st.dataframe(inc_year[['date', 'name', 'quantity', 'price', 'revenue']], use_container_width=True)
             
             with tab_exp:
                 if exp_year.empty:
-                    st.info("Κανένα έξοδο για αυτό το έτος.")
+                    st.info("Κανένα έξοδο.")
                 else:
-                    # Group by Category
-                    st.write("**Έξοδα ανά Κατηγορία**")
                     exp_summary = exp_year.groupby('category')[['amount_net', 'vat_amount', 'amount_total']].sum().reset_index()
                     st.dataframe(exp_summary, use_container_width=True)
-                    
-                    st.write("**Αναλυτική Λίστα**")
                     st.dataframe(exp_year[['date', 'category', 'description', 'amount_total']], use_container_width=True)
+            
+            # --- ΝΕΟ: TAB EXPORT ---
+            with tab_export:
+                st.subheader("📥 Λήψη Αρχείων για Excel")
+                st.write("Κατεβάστε τα δεδομένα σας για να τα στείλετε στον λογιστή ή να τα κρατήσετε στο αρχείο σας.")
+                
+                c_ex1, c_ex2 = st.columns(2)
+                
+                # Button 1: Income
+                if not inc_year.empty:
+                    csv_inc = convert_df(inc_year)
+                    c_ex1.download_button(
+                        label="📄 Κατέβασε τα Έσοδα (CSV)",
+                        data=csv_inc,
+                        file_name=f"esoda_{sel_year}.csv",
+                        mime='text/csv',
+                    )
+                else:
+                    c_ex1.info("Δεν υπάρχουν έσοδα για λήψη.")
+
+                # Button 2: Expenses
+                if not exp_year.empty:
+                    csv_exp = convert_df(exp_year)
+                    c_ex2.download_button(
+                        label="📄 Κατέβασε τα Έξοδα (CSV)",
+                        data=csv_exp,
+                        file_name=f"exoda_{sel_year}.csv",
+                        mime='text/csv',
+                    )
+                else:
+                    c_ex2.info("Δεν υπάρχουν έξοδα για λήψη.")
 
     # --------------------------------------------------
     # 4. ΚΑΙΡΟΣ
