@@ -142,21 +142,24 @@ if st.button("Save Crop"):
     st.success(f"Αποθηκεύτηκε: {selected_crop_name} - {new_qty}kg")
 import pandas as pd # Βεβαιώσου ότι έχεις το import pandas στην αρχή
 
+# --- ΕΝΟΤΗΤΑ: ΣΤΑΤΙΣΤΙΚΑ (Με διόρθωση λαθών) ---
 st.divider()
 st.subheader("📊 Στατιστικά Καλλιεργειών")
 
 if 'crops' in st.session_state and st.session_state.crops:
+    # Δημιουργία DataFrame
     df = pd.DataFrame(st.session_state.crops)
 
-    # --- ΔΙΟΡΘΩΣΗ: Έλεγχος αν υπάρχουν οι στήλες ---
-    # Αν λείπει η στήλη 'quantity', τη φτιάχνουμε με μηδενικά
+    # 🛠️ ΑΣΦΑΛΕΙΑ: Ελέγχουμε αν λείπουν στήλες και τις δημιουργούμε
+    # Αυτό λύνει το StreamlitColumnNotFoundError
     if 'quantity' not in df.columns:
         df['quantity'] = 0
-    
-    # Αν λείπει η στήλη 'moisture', τη φτιάχνουμε με μηδενικά
     if 'moisture' not in df.columns:
         df['moisture'] = 0.0
-    # -----------------------------------------------
+        
+    # Γεμίζουμε τυχόν κενά (NaN) με μηδενικά για να μην σκάσει το γράφημα
+    df['quantity'] = df['quantity'].fillna(0)
+    df['moisture'] = df['moisture'].fillna(0.0)
 
     col1, col2 = st.columns(2)
 
@@ -167,41 +170,37 @@ if 'crops' in st.session_state and st.session_state.crops:
     with col2:
         st.caption("Επίπεδα Υγρασίας (%)")
         st.line_chart(df, x="name", y="moisture")
-
-    # Υπολογισμός συνόλου (με ασφάλεια)
+        
     total_qty = df['quantity'].sum()
-    st.metric(label="Συνολική Παραγωγή (kg)", value=f"{total_qty} kg")
-
-    # (Προαιρετικό) Για να δεις τι δεδομένα έχεις πραγματικά μέσα:
-    with st.expander("Προβολή Ακατέργαστων Δεδομένων (Debug)"):
-        st.dataframe(df)
+    st.metric("Συνολική Παραγωγή", f"{total_qty} kg")
 
 else:
-    st.info("Πρόσθεσε μερικές καλλιέργειες για να δεις τα διαγράμματα!")
+    st.info("Πρόσθεσε καλλιέργειες για να δεις τα στατιστικά.")
+
+
+# --- ΕΝΟΤΗΤΑ: ΚΑΙΡΟΣ & EFFISPRAY ---
 st.divider()
 st.subheader("🌦️ Καιρικές Συνθήκες & Ψεκασμοί")
 
-# Συντεταγμένες
+# Συντεταγμένες (π.χ. Λάρισα)
 LAT = 39.639
 LON = 22.419
 
 try:
-    # Προσοχή: Όλα εδώ μέσα είναι στοιχισμένα (έχουν ένα Tab μπροστά)
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m"
-    response = requests.get(url)
+    response = requests.get(url) # Προϋποθέτει import requests στην αρχή
     data = response.json()
     
     current = data['current_weather']
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Θερμοκρασία", f"{current['temperature']} °C")
-    col2.metric("Ταχύτητα Ανέμου", f"{current['windspeed']} km/h")
-    col3.info("Δεδομένα από Open-Meteo") 
+    w_col1, w_col2, w_col3 = st.columns(3)
+    w_col1.metric("Θερμοκρασία", f"{current['temperature']} °C")
+    w_col2.metric("Ταχύτητα Ανέμου", f"{current['windspeed']} km/h")
+    w_col3.info("Live δεδομένα Open-Meteo")
 
 except Exception as e:
-    # Το except πρέπει να είναι στην ίδια ευθεία με το try (τέρμα αριστερά)
-    st.error("Δεν ήταν δυνατή η λήψη καιρικών δεδομένων.")
+    st.warning("⚠️ Δεν φορτώθηκαν τα καιρικά δεδομένα.")
 
-# Το iframe είναι εκτός try/except, τέρμα αριστερά
+# EffiSpray
 st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
 components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
