@@ -13,6 +13,55 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
+# 🎨 UI & DESIGN (CSS STYLING) - Η ΑΙΣΘΗΤΙΚΗ ΑΝΑΒΑΘΜΙΣΗ
+# ==============================================================================
+def local_css():
+    st.markdown("""
+    <style>
+        /* 1. Αλλαγή Φόντου σε απαλό Πράσινο-Γαλάζιο Gradient */
+        .stApp {
+            background-image: linear-gradient(to bottom right, #ebf7eb, #e3f2fd);
+        }
+
+        /* 2. Στυλ για το Sidebar (Πιο σκούρο για αντίθεση) */
+        [data-testid="stSidebar"] {
+            background-image: linear-gradient(180deg, #f1f8e9, #ffffff);
+            border-right: 1px solid #c8e6c9;
+        }
+
+        /* 3. Στυλ για τα Κουμπιά (Πράσινα και Στρογγυλεμένα) */
+        .stButton>button {
+            color: white;
+            background-color: #2e7d32;
+            border-radius: 12px;
+            border: none;
+            transition: 0.3s;
+        }
+        .stButton>button:hover {
+            background-color: #1b5e20;
+            transform: scale(1.02);
+        }
+
+        /* 4. Στυλ για τα Inputs (Άσπρο φόντο για να ξεχωρίζουν) */
+        .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
+            background-color: #ffffff;
+            border-radius: 8px;
+            border: 1px solid #a5d6a7;
+        }
+
+        /* 5. Απόκρυψη Streamlit Branding (για Admin/Users) */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .stDeployButton {display:none;}
+        
+    </style>
+    """, unsafe_allow_html=True)
+
+# Εφαρμογή του CSS
+local_css()
+
+# ==============================================================================
 # 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ & SESSION STATE
 # ==============================================================================
 
@@ -41,24 +90,6 @@ if 'expenses_log' not in st.session_state:
     st.session_state.expenses_log = [] # ΕΞΟΔΑ
 if 'support_messages' not in st.session_state:
     st.session_state.support_messages = [] # ΜΗΝΥΜΑΤΑ
-
-# ==============================================================================
-# 🎨 ΑΣΦΑΛΕΙΑ & ΑΠΟΚΡΥΨΗ MENU
-# ==============================================================================
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stDeployButton {display:none;}
-            </style>
-            """
-
-if not st.session_state.authenticated:
-    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-else:
-    if st.session_state.current_user['role'] != 'owner':
-        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==============================================================================
 # 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
@@ -123,29 +154,32 @@ def logout():
 # 🔐 ΟΘΟΝΗ ΕΙΣΟΔΟΥ
 # ==================================================
 if not st.session_state.authenticated:
-    st.title("🔐 AgroManager Login")
-    tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
+    st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🔐 AgroManager Login</h1>", unsafe_allow_html=True)
     
-    with tab1:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Είσοδος"):
-            login_user(username, password)
-            
-    with tab2:
-        st.write("Δημιουργήστε νέο λογαριασμό:")
-        c1, c2 = st.columns(2)
-        new_user = c1.text_input("Επιθυμητό Username")
-        new_pass = c2.text_input("Επιθυμητό Password", type="password")
-        c3, c4 = st.columns(2)
-        new_name = c3.text_input("Ονοματεπώνυμο")
-        new_email = c4.text_input("Email (για ειδοποιήσεις)")
+    # Κεντράρισμα Login Form
+    col_spacer1, col_login, col_spacer2 = st.columns([1, 2, 1])
+    
+    with col_login:
+        tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
         
-        if st.button("Δημιουργία Λογαριασμού"):
-            if new_user and new_pass and new_name and new_email:
-                register_user(new_user, new_pass, new_name, new_email)
-            else:
-                st.warning("Συμπληρώστε όλα τα πεδία.")
+        with tab1:
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            if st.button("Είσοδος", use_container_width=True):
+                login_user(username, password)
+                
+        with tab2:
+            st.write("Δημιουργήστε νέο λογαριασμό:")
+            new_user = st.text_input("Επιθυμητό Username")
+            new_pass = st.text_input("Επιθυμητό Password", type="password")
+            new_name = st.text_input("Ονοματεπώνυμο")
+            new_email = st.text_input("Email (για ειδοποιήσεις)")
+            
+            if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
+                if new_user and new_pass and new_name and new_email:
+                    register_user(new_user, new_pass, new_name, new_email)
+                else:
+                    st.warning("Συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
@@ -153,7 +187,9 @@ else:
     # ==================================================
     with st.sidebar:
         user_role = st.session_state.current_user['role']
-        st.info(f"👤 **{st.session_state.current_user['name']}**\nRole: {user_role.upper()}")
+        st.markdown(f"### 👤 {st.session_state.current_user['name']}")
+        st.caption(f"Role: {user_role.upper()}")
+        st.divider()
         
         menu_options = [
             "📝 Νέα Καταγραφή (Έσοδα)", 
@@ -167,16 +203,13 @@ else:
             menu_options.append("📨 Εισερχόμενα Μηνύματα")
         
         if user_role == 'owner':
-            st.warning("👑 Owner Mode")
             menu_options.append("👥 Διαχείριση Χρηστών")
-        elif user_role == 'admin':
-            st.info("🔧 Admin Mode")
             
+        menu_choice = st.radio("Πλοήγηση", menu_options)
+        
+        st.divider()
         if st.button("🚪 Αποσύνδεση"):
             logout()
-        st.divider()
-        st.title("Μενού")
-        menu_choice = st.radio("Πλοήγηση", menu_options)
 
     # --- DB CROPS ---
     default_crops = [
@@ -193,7 +226,7 @@ else:
         {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "wiki_term": "Άμπελος"},
     ]
 
-    st.title("🌱 Agricultural Management System")
+    st.markdown("<h1 style='color:#1b5e20;'>🌱 AgroManager Pro</h1>", unsafe_allow_html=True)
 
     # --------------------------------------------------
     # 1. ΚΑΤΑΓΡΑΦΗ ΕΣΟΔΩΝ
@@ -201,22 +234,23 @@ else:
     if menu_choice == "📝 Νέα Καταγραφή (Έσοδα)":
         st.header("Εισαγωγή Παραγωγής & Πωλήσεων")
         
-        crop_options = [c['name'] for c in default_crops] + ["➕ Προσθήκη Νέας..."]
-        selected_option = st.selectbox("Επίλεξε Καλλιέργεια:", crop_options)
-        
-        current_name = ""
-        current_category = ""
-        
-        if selected_option == "➕ Προσθήκη Νέας...":
-            col_new1, col_new2 = st.columns(2)
-            current_name = col_new1.text_input("Όνομα Καλλιέργειας")
-            current_category = col_new2.text_input("Κατηγορία")
-        else:
-            crop_data = next((item for item in default_crops if item["name"] == selected_option), None)
-            if crop_data:
-                current_name = crop_data['name']
-                current_category = crop_data['category']
-                st.info(f"Κατηγορία: **{current_category}**")
+        with st.container(border=True):
+            crop_options = [c['name'] for c in default_crops] + ["➕ Προσθήκη Νέας..."]
+            selected_option = st.selectbox("Επίλεξε Καλλιέργεια:", crop_options)
+            
+            current_name = ""
+            current_category = ""
+            
+            if selected_option == "➕ Προσθήκη Νέας...":
+                col_new1, col_new2 = st.columns(2)
+                current_name = col_new1.text_input("Όνομα Καλλιέργειας")
+                current_category = col_new2.text_input("Κατηγορία")
+            else:
+                crop_data = next((item for item in default_crops if item["name"] == selected_option), None)
+                if crop_data:
+                    current_name = crop_data['name']
+                    current_category = crop_data['category']
+                    st.info(f"Κατηγορία: **{current_category}**")
 
         st.divider()
         
@@ -234,7 +268,7 @@ else:
             
             total_revenue = rec_qty * rec_price
             if rec_qty > 0 and rec_price > 0:
-                st.info(f"💵 Έσοδο: **{total_revenue:.2f} €**")
+                st.markdown(f"### 💵 Έσοδο: **{total_revenue:.2f} €**")
 
             notes = st.text_area("Σημειώσεις")
             submitted = st.form_submit_button("💾 Αποθήκευση Εσόδου")
@@ -344,10 +378,11 @@ else:
             total_exp = exp_year['amount_total'].sum() if not exp_year.empty else 0.0
             net_profit = total_rev - total_exp
             
-            col1, col2, col3 = st.columns(3)
-            col1.metric("💰 Έσοδα", f"{total_rev:.2f} €")
-            col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €")
-            col3.metric("📉 ΚΑΘΑΡΟ ΚΕΡΔΟΣ", f"{net_profit:.2f} €", delta=f"{net_profit:.2f} €")
+            with st.container(border=True):
+                col1, col2, col3 = st.columns(3)
+                col1.metric("💰 Έσοδα", f"{total_rev:.2f} €")
+                col2.metric("💸 Έξοδα (με ΦΠΑ)", f"{total_exp:.2f} €")
+                col3.metric("📉 ΚΑΘΑΡΟ ΚΕΡΔΟΣ", f"{net_profit:.2f} €", delta=f"{net_profit:.2f} €")
             
             st.markdown("---")
             
@@ -369,8 +404,6 @@ else:
             
             with tab_export:
                 st.subheader("📥 Λήψη Αρχείων για Excel")
-                st.write("Κατεβάστε τα δεδομένα σας για να τα στείλετε στον λογιστή.")
-                
                 c_ex1, c_ex2 = st.columns(2)
                 
                 if not inc_year.empty:
@@ -386,7 +419,7 @@ else:
                     c_ex2.info("Χωρίς έξοδα.")
 
     # --------------------------------------------------
-    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (CUSTOM INPUTS ADDED)
+    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (GDD & VRT)
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & Γεωργία Ακριβείας":
         st.header("🌦️ Καιρός & Γεωργία Ακριβείας")
@@ -423,24 +456,17 @@ else:
                     
                     st.divider()
                     
-                    # --- GDD CALCULATOR (UPDATED) ---
+                    # --- GDD CALCULATOR ---
                     st.subheader("🧬 Υπολογιστής Ημεροβαθμών Ανάπτυξης (GDD)")
-                    st.caption("Επιστημονική εκτίμηση ανάπτυξης φυτού βάσει θερμοκρασίας.")
                     
                     with st.container(border=True):
                         col_crop1, col_crop2 = st.columns(2)
-                        
-                        # 1. Select Crop (With Custom Option)
-                        crop_gdd_options = ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα", "✏️ Άλλο / Custom"]
-                        crop_gdd_sel = col_crop1.selectbox("Επιλογή Καλλιέργειας:", crop_gdd_options)
-                        
-                        # 2. Input Variety (NEW)
+                        crop_gdd_sel = col_crop1.selectbox("Επιλογή Καλλιέργειας:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα", "✏️ Άλλο / Custom"])
                         variety_gdd = col_crop2.text_input("Ποικιλία (Variety):", placeholder="π.χ. ST-402")
                         
                         t_base = 10.0
                         final_crop_name = crop_gdd_sel
                         
-                        # Logic for Custom Crop
                         if crop_gdd_sel == "✏️ Άλλο / Custom":
                             col_c1, col_c2 = st.columns(2)
                             final_crop_name = col_c1.text_input("Όνομα Καλλιέργειας", placeholder="π.χ. Φιστίκι")
@@ -451,46 +477,33 @@ else:
                             elif crop_gdd_sel == "Σιτάρι": t_base = 0.0
                             elif crop_gdd_sel == "Τομάτα": t_base = 10.0
                         
-                        # Calculation
                         t_max = daily['temperature_2m_max'][0]
                         t_min = daily['temperature_2m_min'][0]
-                        t_avg = (t_max + t_min) / 2
-                        gdd = t_avg - t_base
+                        gdd = ((t_max + t_min) / 2) - t_base
                         if gdd < 0: gdd = 0
                         
-                        # Display
                         k1, k2, k3 = st.columns(3)
                         k1.metric("Μέγιστη", f"{t_max} °C")
                         k2.metric("Ελάχιστη", f"{t_min} °C")
                         k3.metric("Tbase", f"{t_base} °C")
                         
                         st.markdown(f"#### 🌡️ GDD Σήμερα ({final_crop_name} - {variety_gdd}): **{gdd:.1f}**")
-                        
-                        if gdd > 0:
-                            st.success(f"✅ Το φυτό αναπτύσσεται κανονικά.")
-                        else:
-                            st.warning(f"❄️ Η ανάπτυξη έχει σταματήσει.")
+                        if gdd > 0: st.success("✅ Το φυτό αναπτύσσεται κανονικά.")
+                        else: st.warning("❄️ Η ανάπτυξη έχει σταματήσει.")
 
                     st.divider()
                     
-                    # --- VRT FERTILIZER CALCULATOR (UPDATED) ---
+                    # --- VRT CALCULATOR ---
                     st.subheader("🧪 Υπολογιστής Λίπανσης (VRT Logic)")
-                    st.caption("Υπολογισμός απαιτήσεων θρέψης βάσει στόχου παραγωγής.")
                     
                     with st.container(border=True):
                         col_vrt1, col_vrt2 = st.columns(2)
-                        
-                        # 1. Crop Selection (With Custom)
-                        crop_fert_options = ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "✏️ Άλλο / Custom"]
-                        crop_fert_sel = col_vrt1.selectbox("Καλλιέργεια:", crop_fert_options)
-                        
-                        # 2. Variety Input (NEW)
+                        crop_fert_sel = col_vrt1.selectbox("Καλλιέργεια:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "✏️ Άλλο / Custom"])
                         variety_vrt = col_vrt2.text_input("Ποικιλία:", placeholder="π.χ. Pioneer P1570")
                         
                         removal_coeff = 0.0
                         final_fert_crop = crop_fert_sel
                         
-                        # Logic for Custom Crop VRT
                         if crop_fert_sel == "✏️ Άλλο / Custom":
                             col_vc1, col_vc2 = st.columns(2)
                             final_fert_crop = col_vc1.text_input("Όνομα Καλλιέργειας (VRT)", placeholder="π.χ. Ηλίανθος")
@@ -500,19 +513,10 @@ else:
                             elif crop_fert_sel == "Καλαμπόκι": removal_coeff = 2.5
                             elif crop_fert_sel == "Σιτάρι": removal_coeff = 3.0
                         
-                        # 3. Target Yield
                         target_yield = st.number_input("Στόχος Παραγωγής (kg/στρέμμα):", min_value=100, step=50, value=400)
-                        
-                        # 4. Calculate Needs
                         n_needs = (target_yield / 100) * removal_coeff
                         
-                        # 5. Select Fertilizer (With Custom)
-                        fert_options = [
-                            "Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", 
-                            "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)",
-                            "✏️ Άλλο / Custom"
-                        ]
-                        fert_sel = st.selectbox("Τύπος Λιπάσματος:", fert_options)
+                        fert_sel = st.selectbox("Τύπος Λιπάσματος:", ["Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "✏️ Άλλο / Custom"])
                         
                         n_content = 0.0
                         final_fert_name = fert_sel
@@ -528,15 +532,13 @@ else:
                             elif "21" in fert_sel: n_content = 0.21
                             elif "20" in fert_sel: n_content = 0.20
                         
-                        # 6. Final Calc
                         if n_content > 0 and removal_coeff > 0:
                             efficiency = 0.8
-                            fert_kg_per_stremma = (n_needs / n_content) / efficiency
-                            
+                            fert_kg = (n_needs / n_content) / efficiency
                             st.info(f"Για στόχο **{target_yield} kg/στρ** {final_fert_crop} ({variety_vrt}), απαιτούνται **{n_needs:.1f} μονάδες Αζώτου**.")
-                            st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg_per_stremma:.1f} kg/στρέμμα** {final_fert_name}")
-                        elif crop_fert_sel == "✏️ Άλλο / Custom" or fert_sel == "✏️ Άλλο / Custom":
-                            st.warning("Συμπληρώστε τα πεδία Custom για να γίνει ο υπολογισμός.")
+                            st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg:.1f} kg/στρέμμα** {final_fert_name}")
+                        elif "✏️" in crop_fert_sel or "✏️" in fert_sel:
+                            st.warning("Συμπληρώστε τα πεδία Custom.")
 
                     st.markdown("---")
                     st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
@@ -554,17 +556,13 @@ else:
     # --------------------------------------------------
     elif menu_choice == "🆘 Βοήθεια & Υποστήριξη":
         st.header("🆘 Κέντρο Υποστήριξης")
-        st.write("Συμπληρώστε την παρακάτω φόρμα για να επικοινωνήσετε απευθείας με τον διαχειριστή.")
-        
         with st.form("support_form"):
             default_email = st.session_state.current_user.get('email', '')
             sender_email = st.text_input("Το Email σας (για να λάβετε απάντηση) *", value=default_email)
-            subject = st.text_input("Θέμα Μηνύματος *", placeholder="π.χ. Πρόβλημα με την εγγραφή...")
-            msg_body = st.text_area("Το μήνυμά σας *", placeholder="Γράψτε εδώ λεπτομέρειες...")
+            subject = st.text_input("Θέμα Μηνύματος *")
+            msg_body = st.text_area("Το μήνυμά σας *")
             
-            submit_support = st.form_submit_button("📨 Αποστολή Μηνύματος")
-            
-            if submit_support:
+            if st.form_submit_button("📨 Αποστολή Μηνύματος"):
                 if subject and msg_body and sender_email:
                     msg_entry = {
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -574,22 +572,11 @@ else:
                         "message": msg_body
                     }
                     st.session_state.support_messages.append(msg_entry)
-                    
                     admin_email = "johnkrv1@gmail.com"
-                    email_subj_formatted = f"🔔 AgroManager Support: {subject}"
-                    email_body_formatted = (
-                        f"Νέο μήνυμα υποστήριξης από: {st.session_state.current_user['name']}\n"
-                        f"Email Επικοινωνίας: {sender_email}\n\n"
-                        f"Θέμα: {subject}\n"
-                        f"------------------------------------------------\n"
-                        f"{msg_body}\n"
-                        f"------------------------------------------------\n"
-                    )
-                    send_email_notification(admin_email, email_subj_formatted, email_body_formatted)
-                    
-                    st.success("Το μήνυμά σας εστάλη επιτυχώς!")
+                    send_email_notification(admin_email, f"🔔 Support: {subject}", f"Νέο μήνυμα από {sender_email}:\n\n{msg_body}")
+                    st.success("Το μήνυμά σας εστάλη!")
                 else:
-                    st.error("⚠️ Παρακαλώ συμπληρώστε όλα τα πεδία.")
+                    st.error("Συμπληρώστε όλα τα πεδία.")
 
     # --------------------------------------------------
     # 6. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (OWNER & ADMIN)
@@ -597,40 +584,22 @@ else:
     elif menu_choice == "📨 Εισερχόμενα Μηνύματα":
          if st.session_state.current_user['role'] not in ['owner', 'admin']:
              st.stop()
-             
          st.header("📨 Εισερχόμενα Μηνύματα Χρηστών")
-         
          if not st.session_state.support_messages:
              st.info("Δεν υπάρχουν νέα μηνύματα.")
          else:
-             msg_df = pd.DataFrame(st.session_state.support_messages)
-             msg_df = msg_df.iloc[::-1]
-             
-             st.dataframe(
-                 msg_df,
-                 column_config={
-                     "timestamp": "Ημερομηνία",
-                     "user": "Χρήστης",
-                     "email": "Email Απάντησης",
-                     "subject": "Θέμα",
-                     "message": "Μήνυμα"
-                 },
-                 use_container_width=True,
-                 hide_index=True
-             )
+             st.dataframe(pd.DataFrame(st.session_state.support_messages).iloc[::-1], use_container_width=True, hide_index=True)
 
     # --------------------------------------------------
     # 7. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (OWNER ONLY)
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
         if st.session_state.current_user['role'] != 'owner':
-             st.error("⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ Η ΠΡΟΣΒΑΣΗ.")
              st.stop()
-        
         st.header("👑 Πίνακας Ελέγχου Owner")
         
         with st.expander("➕ Προσθήκη Νέου Χρήστη", expanded=True):
-            with st.form("create_user_admin_form"):
+            with st.form("create_user"):
                 c1, c2 = st.columns(2)
                 new_u = c1.text_input("Username")
                 new_p = c2.text_input("Password")
@@ -638,32 +607,15 @@ else:
                 new_n = c3.text_input("Όνομα")
                 new_e = c4.text_input("Email")
                 new_role = st.selectbox("Ρόλος", ["user", "admin"])
-                
                 if st.form_submit_button("Δημιουργία"):
-                    if new_u and new_p and new_n:
-                        st.session_state.users_db[new_u] = {
-                            "password": new_p,
-                            "role": new_role,
-                            "name": new_n,
-                            "email": new_e
-                        }
-                        st.success("Δημιουργήθηκε!")
-                        st.rerun()
+                    st.session_state.users_db[new_u] = {"password": new_p, "role": new_role, "name": new_n, "email": new_e}
+                    st.success("Δημιουργήθηκε!")
+                    st.rerun()
 
         st.divider()
         st.subheader("📋 Λίστα Εγγεγραμμένων")
-
-        h1, h2, h3, h4, h5, h6 = st.columns([2, 2, 2, 1, 2, 1])
-        h1.markdown("**Username**")
-        h2.markdown("**Όνομα**")
-        h3.markdown("**Email**")
-        h4.markdown("**Ρόλος**")
-        h5.markdown("**Κωδικός**")
-        h6.markdown("**Προβολή**")
-        st.divider()
-
         for uname, udata in st.session_state.users_db.items():
-            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 1, 2, 1])
+            c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 1, 1])
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
@@ -677,12 +629,10 @@ else:
             
             if st.session_state[toggle_key]:
                 c5.warning(f"`{udata['password']}`")
-                btn_icon = "🙈"
             else:
                 c5.text("••••••••")
-                btn_icon = "👁️"
-            
-            if c6.button(btn_icon, key=f"btn_{uname}"):
+                
+            if c5.button("👁️", key=f"btn_{uname}"):
                 st.session_state[toggle_key] = not st.session_state[toggle_key]
                 st.rerun()
             st.markdown("---")
