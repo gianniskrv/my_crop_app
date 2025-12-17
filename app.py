@@ -43,7 +43,7 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# Force Admin Update (για να είσαι πάντα Admin)
+# Force Admin Update
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "admin", 
@@ -126,13 +126,11 @@ else:
         user_role = st.session_state.current_user['role']
         st.info(f"👤 **{st.session_state.current_user['name']}**")
         
-        # Λίστα επιλογών μενού
         menu_options = ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"]
         
-        # ΑΝ ΕΙΣΑΙ ADMIN, ΠΡΟΣΘΕΤΟΥΜΕ ΤΗΝ ΕΠΙΛΟΓΗ ΔΙΑΧΕΙΡΙΣΗΣ
         if user_role == 'admin':
             st.warning("🔧 Admin Mode: Enabled")
-            menu_options.append("👥 Διαχείριση Χρηστών") # <--- ΝΕΟ
+            menu_options.append("👥 Διαχείριση Χρηστών")
             
         if st.button("🚪 Αποσύνδεση"):
             logout()
@@ -352,25 +350,48 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ΜΟΝΟ ΓΙΑ ADMIN)
+    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY) - NEW SECURE VIEW
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
-        st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin Only)")
-        st.info("Εδώ βλέπετε όλους τους λογαριασμούς που έχουν δημιουργηθεί στην πλατφόρμα.")
+        st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin)")
+        st.caption("Διαχείριση εγγεγραμμένων χρηστών. Πατήστε το 👁️ για να δείτε τον κωδικό.")
         
-        # Μετατροπή της βάσης δεδομένων σε πίνακα
-        # Η users_db είναι λεξικό, το κάνουμε λίστα για να φαίνεται ωραία
-        users_list = []
+        # Επικεφαλίδες Πίνακα
+        h1, h2, h3, h4, h5 = st.columns([2, 2, 2, 2, 1])
+        h1.markdown("**Username**")
+        h2.markdown("**Όνομα**")
+        h3.markdown("**Email**")
+        h4.markdown("**Κωδικός**")
+        h5.markdown("**Προβολή**")
+        st.divider()
+
+        # Λούπα για κάθε χρήστη στη βάση
         for uname, udata in st.session_state.users_db.items():
-            users_list.append({
-                "Username": uname,
-                "Ονοματεπώνυμο": udata['name'],
-                "Email": udata.get('email', '-'),
-                "Ρόλος": udata['role'],
-                "Κωδικός": udata['password'] # Εμφανίζεται γιατί είσαι Admin
-            })
-        
-        users_df = pd.DataFrame(users_list)
-        st.dataframe(users_df, use_container_width=True)
-        
-        st.write(f"**Σύνολο εγγεγραμμένων χρηστών:** {len(users_list)}")
+            # Δημιουργία στήλης για κάθε στοιχείο
+            c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1])
+            
+            c1.write(uname)
+            c2.write(udata['name'])
+            c3.write(udata.get('email', '-'))
+            
+            # --- LOGIC ΓΙΑ ΤΟ ΜΑΤΑΚΙ ---
+            # Κλειδί για να θυμόμαστε αν είναι ανοιχτό ή κλειστό το ματάκι για τον συγκεκριμένο χρήστη
+            toggle_key = f"vis_{uname}"
+            if toggle_key not in st.session_state:
+                st.session_state[toggle_key] = False # Default: Κλειστό
+            
+            # Εμφάνιση Κωδικού ή Τελείας
+            if st.session_state[toggle_key]:
+                c4.warning(f"`{udata['password']}`") # Αν είναι ανοιχτό, δείξτο
+                btn_icon = "🙈" # Κουμπί για κλείσιμο
+            else:
+                c4.text("••••••••") # Αν είναι κλειστό
+                btn_icon = "👁️" # Κουμπί για άνοιγμα
+            
+            # Το Κουμπί
+            if c5.button(btn_icon, key=f"btn_{uname}"):
+                # Αλλαγή κατάστασης (True/False)
+                st.session_state[toggle_key] = not st.session_state[toggle_key]
+                st.rerun() # Refresh για να φανεί η αλλαγή
+                
+            st.markdown("---")
