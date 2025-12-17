@@ -386,7 +386,7 @@ else:
                     c_ex2.info("Χωρίς έξοδα.")
 
     # --------------------------------------------------
-    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (GDD & VRT)
+    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (CUSTOM INPUTS ADDED)
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & Γεωργία Ακριβείας":
         st.header("🌦️ Καιρός & Γεωργία Ακριβείας")
@@ -423,99 +423,120 @@ else:
                     
                     st.divider()
                     
-                    # --- GDD CALCULATOR ---
+                    # --- GDD CALCULATOR (UPDATED) ---
                     st.subheader("🧬 Υπολογιστής Ημεροβαθμών Ανάπτυξης (GDD)")
-                    st.caption("Επιστημονική εκτίμηση ανάπτυξης φυτού βάσει θερμοκρασίας (Precision Ag Logic).")
+                    st.caption("Επιστημονική εκτίμηση ανάπτυξης φυτού βάσει θερμοκρασίας.")
                     
                     with st.container(border=True):
-                        crop_gdd = st.selectbox("Επιλέξτε Καλλιέργεια για Ανάλυση:", 
-                                                ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα"])
+                        col_crop1, col_crop2 = st.columns(2)
+                        
+                        # 1. Select Crop (With Custom Option)
+                        crop_gdd_options = ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα", "✏️ Άλλο / Custom"]
+                        crop_gdd_sel = col_crop1.selectbox("Επιλογή Καλλιέργειας:", crop_gdd_options)
+                        
+                        # 2. Input Variety (NEW)
+                        variety_gdd = col_crop2.text_input("Ποικιλία (Variety):", placeholder="π.χ. ST-402")
                         
                         t_base = 10.0
-                        if crop_gdd == "Βαμβάκι": t_base = 15.6
-                        elif crop_gdd == "Καλαμπόκι": t_base = 10.0
-                        elif crop_gdd == "Σιτάρι": t_base = 0.0
-                        elif crop_gdd == "Τομάτα": t_base = 10.0
+                        final_crop_name = crop_gdd_sel
                         
+                        # Logic for Custom Crop
+                        if crop_gdd_sel == "✏️ Άλλο / Custom":
+                            col_c1, col_c2 = st.columns(2)
+                            final_crop_name = col_c1.text_input("Όνομα Καλλιέργειας", placeholder="π.χ. Φιστίκι")
+                            t_base = col_c2.number_input("Βασική Θερμοκρασία (Tbase) °C:", min_value=0.0, value=10.0, step=0.1)
+                        else:
+                            if crop_gdd_sel == "Βαμβάκι": t_base = 15.6
+                            elif crop_gdd_sel == "Καλαμπόκι": t_base = 10.0
+                            elif crop_gdd_sel == "Σιτάρι": t_base = 0.0
+                            elif crop_gdd_sel == "Τομάτα": t_base = 10.0
+                        
+                        # Calculation
                         t_max = daily['temperature_2m_max'][0]
                         t_min = daily['temperature_2m_min'][0]
-                        
                         t_avg = (t_max + t_min) / 2
                         gdd = t_avg - t_base
                         if gdd < 0: gdd = 0
                         
+                        # Display
                         k1, k2, k3 = st.columns(3)
-                        k1.metric("Μέγιστη Θερμοκρασία", f"{t_max} °C")
-                        k2.metric("Ελάχιστη Θερμοκρασία", f"{t_min} °C")
-                        k3.metric("Βασική Θερμοκρασία (Tbase)", f"{t_base} °C")
+                        k1.metric("Μέγιστη", f"{t_max} °C")
+                        k2.metric("Ελάχιστη", f"{t_min} °C")
+                        k3.metric("Tbase", f"{t_base} °C")
                         
-                        st.markdown(f"#### 🌡️ Ημεροβαθμοί (GDD) Σήμερα: **{gdd:.1f}**")
+                        st.markdown(f"#### 🌡️ GDD Σήμερα ({final_crop_name} - {variety_gdd}): **{gdd:.1f}**")
                         
                         if gdd > 0:
-                            st.success(f"✅ Το {crop_gdd} αναπτύσσεται κανονικά σήμερα.")
+                            st.success(f"✅ Το φυτό αναπτύσσεται κανονικά.")
                         else:
-                            st.warning(f"❄️ Οι θερμοκρασίες είναι πολύ χαμηλές για το {crop_gdd}. Η ανάπτυξη έχει σταματήσει.")
+                            st.warning(f"❄️ Η ανάπτυξη έχει σταματήσει.")
 
                     st.divider()
                     
-                    # --- VRT FERTILIZER CALCULATOR (ME CUSTOM) ---
+                    # --- VRT FERTILIZER CALCULATOR (UPDATED) ---
                     st.subheader("🧪 Υπολογιστής Λίπανσης (VRT Logic)")
-                    st.caption("Υπολογισμός απαιτήσεων θρέψης βάσει στόχου παραγωγής και τύπου καλλιέργειας.")
+                    st.caption("Υπολογισμός απαιτήσεων θρέψης βάσει στόχου παραγωγής.")
                     
                     with st.container(border=True):
-                        # 1. Crop Selection
-                        crop_fert = st.selectbox("Επιλογή Καλλιέργειας:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
+                        col_vrt1, col_vrt2 = st.columns(2)
                         
-                        # Removal Coefficients (N units per 100 kg yield)
-                        removal_coeff = 0
-                        if crop_fert == "Βαμβάκι": removal_coeff = 4.5
-                        elif crop_fert == "Καλαμπόκι": removal_coeff = 2.5
-                        elif crop_fert == "Σιτάρι": removal_coeff = 3.0
+                        # 1. Crop Selection (With Custom)
+                        crop_fert_options = ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "✏️ Άλλο / Custom"]
+                        crop_fert_sel = col_vrt1.selectbox("Καλλιέργεια:", crop_fert_options)
                         
-                        # 2. Target Yield
+                        # 2. Variety Input (NEW)
+                        variety_vrt = col_vrt2.text_input("Ποικιλία:", placeholder="π.χ. Pioneer P1570")
+                        
+                        removal_coeff = 0.0
+                        final_fert_crop = crop_fert_sel
+                        
+                        # Logic for Custom Crop VRT
+                        if crop_fert_sel == "✏️ Άλλο / Custom":
+                            col_vc1, col_vc2 = st.columns(2)
+                            final_fert_crop = col_vc1.text_input("Όνομα Καλλιέργειας (VRT)", placeholder="π.χ. Ηλίανθος")
+                            removal_coeff = col_vc2.number_input("Μονάδες Αζώτου (N) ανά 100kg καρπού:", min_value=0.0, value=3.0, step=0.1)
+                        else:
+                            if crop_fert_sel == "Βαμβάκι": removal_coeff = 4.5
+                            elif crop_fert_sel == "Καλαμπόκι": removal_coeff = 2.5
+                            elif crop_fert_sel == "Σιτάρι": removal_coeff = 3.0
+                        
+                        # 3. Target Yield
                         target_yield = st.number_input("Στόχος Παραγωγής (kg/στρέμμα):", min_value=100, step=50, value=400)
                         
-                        # 3. Calculate N Needs
+                        # 4. Calculate Needs
                         n_needs = (target_yield / 100) * removal_coeff
                         
-                        # 4. Select Fertilizer (CUSTOM OPTION ADDED)
+                        # 5. Select Fertilizer (With Custom)
                         fert_options = [
-                            "Ουρία (46-0-0)", 
-                            "Νιτρική Αμμωνία (34.5-0-0)", 
-                            "Θειική Αμμωνία (21-0-0)", 
-                            "NPK (20-20-20)",
-                            "✏️ Άλλο / Custom" # <--- ΝΕΑ ΕΠΙΛΟΓΗ
+                            "Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", 
+                            "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)",
+                            "✏️ Άλλο / Custom"
                         ]
-                        
-                        fert_sel = st.selectbox("Τύπος Λιπάσματος (Άζωτο):", fert_options)
+                        fert_sel = st.selectbox("Τύπος Λιπάσματος:", fert_options)
                         
                         n_content = 0.0
                         final_fert_name = fert_sel
                         
-                        # Λογική: Αν διάλεξε Custom, του ζητάμε να γράψει
                         if fert_sel == "✏️ Άλλο / Custom":
-                            col_cust1, col_cust2 = st.columns(2)
-                            final_fert_name = col_cust1.text_input("Όνομα Λιπάσματος", placeholder="π.χ. UTEC 46")
-                            n_percent = col_cust2.number_input("Περιεκτικότητα σε Άζωτο (N) %:", min_value=0.0, max_value=100.0, step=0.1)
-                            n_content = n_percent / 100.0 # Μετατροπή % σε δεκαδικό (π.χ. 46% -> 0.46)
+                            col_f1, col_f2 = st.columns(2)
+                            final_fert_name = col_f1.text_input("Όνομα Λιπάσματος", placeholder="π.χ. UTEC 46")
+                            n_percent = col_f2.number_input("Περιεκτικότητα N (%):", min_value=0.0, max_value=100.0, step=0.1)
+                            n_content = n_percent / 100.0
                         else:
-                            # Αυτόματη αναγνώριση από τα έτοιμα
                             if "46" in fert_sel: n_content = 0.46
                             elif "34.5" in fert_sel: n_content = 0.345
                             elif "21" in fert_sel: n_content = 0.21
                             elif "20" in fert_sel: n_content = 0.20
                         
-                        # 5. Calculation (Only if N > 0)
-                        if n_content > 0:
-                            efficiency = 0.8 # VRT Standard
+                        # 6. Final Calc
+                        if n_content > 0 and removal_coeff > 0:
+                            efficiency = 0.8
                             fert_kg_per_stremma = (n_needs / n_content) / efficiency
                             
-                            st.info(f"Για στόχο **{target_yield} kg/στρ** {crop_fert}, το φυτό χρειάζεται **{n_needs:.1f} μονάδες Αζώτου**.")
+                            st.info(f"Για στόχο **{target_yield} kg/στρ** {final_fert_crop} ({variety_vrt}), απαιτούνται **{n_needs:.1f} μονάδες Αζώτου**.")
                             st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg_per_stremma:.1f} kg/στρέμμα** {final_fert_name}")
-                            st.caption("*Συντελεστής απόδοσης θρέψης: 80%.")
-                        elif fert_sel == "✏️ Άλλο / Custom":
-                            st.warning("Παρακαλώ εισάγετε την περιεκτικότητα αζώτου για να γίνει ο υπολογισμός.")
-
+                        elif crop_fert_sel == "✏️ Άλλο / Custom" or fert_sel == "✏️ Άλλο / Custom":
+                            st.warning("Συμπληρώστε τα πεδία Custom για να γίνει ο υπολογισμός.")
 
                     st.markdown("---")
                     st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
