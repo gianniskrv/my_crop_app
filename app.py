@@ -13,10 +13,10 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL (ΣΥΜΠΛΗΡΩΜΕΝΕΣ)
+# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
-EMAIL_PASSWORD = "kcsq wuoi wnik xzko"  # Ο κωδικός εφαρμογής που έδωσες
+EMAIL_PASSWORD = "kcsq wuoi wnik xzko"
 
 def send_email_notification(receiver_email, subject, body):
     try:
@@ -27,7 +27,6 @@ def send_email_notification(receiver_email, subject, body):
         msg['To'] = receiver_email
 
         context = ssl.create_default_context()
-        # Σύνδεση με Gmail Server
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
             smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
             smtp.send_message(msg)
@@ -45,7 +44,7 @@ if 'users_db' not in st.session_state:
             "password": "21041414", 
             "role": "admin", 
             "name": "Γιάννης", 
-            "email": "johnkrv1@gmail.com" # Το email σου για να λαμβάνεις τις ειδοποιήσεις
+            "email": "johnkrv1@gmail.com" 
         },
         "user": {
             "password": "123", 
@@ -86,7 +85,6 @@ def register_user(new_user, new_pass, new_name, new_email):
         }
         st.success("Ο λογαριασμός δημιουργήθηκε! Τώρα μπορείτε να συνδεθείτε.")
         
-        # Καλωσόρισμα νέου χρήστη
         body = f"Γεια σου {new_name},\n\nΚαλωσήρθες στο AgroManager Pro!\nΟ λογαριασμός σου ενεργοποιήθηκε επιτυχώς."
         send_email_notification(new_email, "Καλωσήρισες στο AgroManager", body)
 
@@ -96,11 +94,10 @@ def logout():
     st.rerun()
 
 # ==================================================
-# 🔐 ΟΘΟΝΗ ΕΙΣΟΔΟΥ / ΕΓΓΡΑΦΗΣ
+# 🔐 ΟΘΟΝΗ ΕΙΣΟΔΟΥ
 # ==================================================
 if not st.session_state.authenticated:
     st.title("🔐 AgroManager Login")
-    
     tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
     
     with tab1:
@@ -111,54 +108,44 @@ if not st.session_state.authenticated:
             
     with tab2:
         st.write("Δημιουργήστε νέο λογαριασμό:")
-        col_r1, col_r2 = st.columns(2)
-        new_user = col_r1.text_input("Επιθυμητό Username")
-        new_pass = col_r2.text_input("Επιθυμητό Password", type="password")
-        
-        col_r3, col_r4 = st.columns(2)
-        new_name = col_r3.text_input("Ονοματεπώνυμο")
-        new_email = col_r4.text_input("Email (για ειδοποιήσεις)")
+        c1, c2 = st.columns(2)
+        new_user = c1.text_input("Επιθυμητό Username")
+        new_pass = c2.text_input("Επιθυμητό Password", type="password")
+        c3, c4 = st.columns(2)
+        new_name = c3.text_input("Ονοματεπώνυμο")
+        new_email = c4.text_input("Email (για ειδοποιήσεις)")
         
         if st.button("Δημιουργία Λογαριασμού"):
             if new_user and new_pass and new_name and new_email:
                 register_user(new_user, new_pass, new_name, new_email)
             else:
-                st.warning("Παρακαλώ συμπληρώστε όλα τα πεδία.")
+                st.warning("Συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
     # 📱 ΚΥΡΙΑ ΕΦΑΡΜΟΓΗ
     # ==================================================
-    
     with st.sidebar:
-        user_role = st.session_state.current_user['role']
-        user_email = st.session_state.current_user.get('email', '-')
-        
-        st.info(f"👤 **{st.session_state.current_user['name']}**\n📧 {user_email}")
-        
-        if user_role == 'admin':
-            st.warning("🔧 Admin Mode: Enabled")
-        
+        st.info(f"👤 **{st.session_state.current_user['name']}**")
         if st.button("🚪 Αποσύνδεση"):
             logout()
-            
         st.divider()
         st.title("Μενού")
-        menu_choice = st.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Ιστορικό", "☁️ Καιρός & EffiSpray"])
+        menu_choice = st.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"])
 
-    # --- ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ ---
+    # --- DB ---
     default_crops = [
-        {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum", "wiki_term": "Βαμβάκι (φυτό)"},
-        {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum", "wiki_term": "Σίτος"},
-        {"name": "Καλαμπόκι", "category": "Σιτηρά", "scientific_name": "Zea mays", "wiki_term": "Αραβόσιτος"},
-        {"name": "Ηλίανθος", "category": "Βιομηχανικά", "scientific_name": "Helianthus annuus", "wiki_term": "Ηλίανθος"},
-        {"name": "Ελιά (Λαδοελιά)", "category": "Δέντρα", "scientific_name": "Olea europaea", "wiki_term": "Ελιά"},
-        {"name": "Ελιά (Βρώσιμη)", "category": "Δέντρα", "scientific_name": "Olea europaea", "wiki_term": "Ελιά"},
-        {"name": "Πορτοκαλιά", "category": "Εσπεριδοειδή", "scientific_name": "Citrus sinensis", "wiki_term": "Πορτοκαλιά"},
-        {"name": "Ροδακινιά", "category": "Πυρηνόκαρπα", "scientific_name": "Prunus persica", "wiki_term": "Ροδακινιά"},
-        {"name": "Τομάτα", "category": "Κηπευτικά", "scientific_name": "Solanum lycopersicum", "wiki_term": "Τομάτα"},
-        {"name": "Πατάτα", "category": "Κηπευτικά", "scientific_name": "Solanum tuberosum", "wiki_term": "Πατάτα"},
-        {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera", "wiki_term": "Άμπελος"},
+        {"name": "Βαμβάκι", "category": "Βιομηχανικά", "wiki_term": "Βαμβάκι (φυτό)"},
+        {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "wiki_term": "Σίτος"},
+        {"name": "Καλαμπόκι", "category": "Σιτηρά", "wiki_term": "Αραβόσιτος"},
+        {"name": "Ηλίανθος", "category": "Βιομηχανικά", "wiki_term": "Ηλίανθος"},
+        {"name": "Ελιά (Λαδοελιά)", "category": "Δέντρα", "wiki_term": "Ελιά"},
+        {"name": "Ελιά (Βρώσιμη)", "category": "Δέντρα", "wiki_term": "Ελιά"},
+        {"name": "Πορτοκαλιά", "category": "Εσπεριδοειδή", "wiki_term": "Πορτοκαλιά"},
+        {"name": "Ροδακινιά", "category": "Πυρηνόκαρπα", "wiki_term": "Ροδακινιά"},
+        {"name": "Τομάτα", "category": "Κηπευτικά", "wiki_term": "Τομάτα"},
+        {"name": "Πατάτα", "category": "Κηπευτικά", "wiki_term": "Πατάτα"},
+        {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "wiki_term": "Άμπελος"},
     ]
 
     if 'history_log' not in st.session_state:
@@ -167,10 +154,10 @@ else:
     st.title("🌱 Agricultural Management System")
 
     # --------------------------------------------------
-    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ
+    # 1. ΝΕΑ ΚΑΤΑΓΡΑΦΗ (ΜΕ ΟΙΚΟΝΟΜΙΚΑ)
     # --------------------------------------------------
     if menu_choice == "📝 Νέα Καταγραφή":
-        st.header("Εισαγωγή Δεδομένων Παραγωγής")
+        st.header("Εισαγωγή Παραγωγής & Οικονομικών")
         
         crop_options = [c['name'] for c in default_crops] + ["➕ Προσθήκη Νέας..."]
         selected_option = st.selectbox("Επίλεξε Καλλιέργεια:", crop_options)
@@ -207,12 +194,23 @@ else:
             rec_date = c1.date_input("Ημερομηνία", date.today())
             rec_variety = c2.text_input("Ποικιλία", placeholder="π.χ. Κορωνέικη")
             
-            c3, c4 = st.columns(2)
+            st.markdown("---")
+            st.write("💰 **Οικονομικά & Ποσότητες**")
+            
+            # ΤΩΡΑ ΕΧΟΥΜΕ 3 ΣΤΗΛΕΣ
+            c3, c4, c5 = st.columns(3)
             rec_qty = c3.number_input("Ποσότητα (kg)", min_value=0, step=10)
             rec_moisture = c4.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, step=0.1)
+            # ΝΕΟ ΠΕΔΙΟ ΤΙΜΗΣ
+            rec_price = c5.number_input("Τιμή Πώλησης (€/kg)", min_value=0.0, step=0.01, format="%.2f")
             
+            # ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΟΥ
+            total_revenue = rec_qty * rec_price
+            if rec_qty > 0 and rec_price > 0:
+                st.info(f"💵 Εκτιμώμενο Έσοδο: **{total_revenue:.2f} €**")
+
             notes = st.text_area("Σημειώσεις", placeholder="Παρατηρήσεις...")
-            submitted = st.form_submit_button("💾 Αποθήκευση & Ενημέρωση Email")
+            submitted = st.form_submit_button("💾 Αποθήκευση")
             
             if submitted:
                 if not current_name:
@@ -227,30 +225,33 @@ else:
                         "variety": rec_variety,
                         "quantity": rec_qty,
                         "moisture": rec_moisture,
+                        "price": rec_price,       # Αποθήκευση Τιμής
+                        "revenue": total_revenue, # Αποθήκευση Συνόλου (€)
                         "notes": notes
                     }
                     st.session_state.history_log.append(new_entry)
-                    st.success(f"Αποθηκεύτηκε: {current_name}")
+                    st.success(f"Αποθηκεύτηκε: {current_name} ({total_revenue:.2f}€)")
                     
                     # Email Sender
                     user_mail = st.session_state.current_user.get('email')
                     if user_mail and "@" in user_mail:
-                        email_subject = f"Νέα Καταγραφή: {current_name}"
+                        email_subject = f"Νέα Πώληση: {current_name}"
                         email_body = (
                             f"Γεια σου {st.session_state.current_user['name']},\n\n"
-                            f"Προστέθηκε μια νέα εγγραφή στο AgroManager:\n"
+                            f"Καταχωρήθηκε νέα εγγραφή:\n"
                             f"- Καλλιέργεια: {current_name}\n"
                             f"- Ποσότητα: {rec_qty} kg\n"
-                            f"- Ημερομηνία: {rec_date}\n\n"
-                            f"Ευχαριστούμε!"
+                            f"- Τιμή: {rec_price} €/kg\n"
+                            f"- ΣΥΝΟΛΟ ΕΣΟΔΩΝ: {total_revenue:.2f} €\n\n"
+                            f"Ημερομηνία: {rec_date}"
                         )
                         send_email_notification(user_mail, email_subject, email_body)
 
     # --------------------------------------------------
-    # 2. ΒΙΒΛΙΟΘΗΚΗ
+    # 2. ΒΙΒΛΙΟΘΗΚΗ (ΜΕ ΟΙΚΟΝΟΜΙΚΑ ΣΥΝΟΛΑ)
     # --------------------------------------------------
-    elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
-        st.header("🗂️ Αρχείο Καλλιεργειών")
+    elif menu_choice == "🗂️ Βιβλιοθήκη & Οικονομικά":
+        st.header("🗂️ Αρχείο & Οικονομικά Στοιχεία")
 
         if not st.session_state.history_log:
             st.info("Δεν υπάρχουν δεδομένα ακόμα.")
@@ -273,26 +274,44 @@ else:
             if df_final.empty:
                 st.warning("Κανένα αποτέλεσμα.")
             else:
-                st.subheader(f"Δεδομένα του {sel_year}")
+                st.subheader(f"Οικονομικά Στοιχεία {sel_year}")
                 
-                st.write("📊 **Σύνολα (kg)**")
-                summary = df_final.groupby(['name'])[['quantity']].sum().reset_index()
-                st.dataframe(summary, use_container_width=True)
+                # ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΙΚΩΝ ΕΣΟΔΩΝ
+                total_income_year = df_final['revenue'].sum()
+                total_kg_year = df_final['quantity'].sum()
+                
+                m1, m2 = st.columns(2)
+                m1.metric("💰 Συνολικά Έσοδα Έτους", f"{total_income_year:.2f} €")
+                m2.metric("⚖️ Συνολική Παραγωγή", f"{total_kg_year} kg")
+                
+                st.write("📊 **Ανάλυση ανά Προϊόν**")
+                # Ομαδοποίηση και εμφάνιση Κιλών ΚΑΙ Ευρώ
+                summary = df_final.groupby(['name'])[['quantity', 'revenue']].sum().reset_index()
+                # Μορφοποίηση πίνακα για να δείχνει τα € ωραία
+                st.dataframe(
+                    summary.style.format({"revenue": "{:.2f} €"}), 
+                    use_container_width=True
+                )
 
-                st.write("📝 **Ιστορικό Εγγραφών**")
+                st.divider()
+                st.write("📝 **Αναλυτικό Ιστορικό**")
                 for i, row in df_final.sort_values(by='date', ascending=False).iterrows():
                     with st.container():
-                        st.markdown(f"**{row['name']}** - {row['variety']} ({row['date']})")
-                        st.caption(f"✍️ Από: {row.get('user', '-')} | Ποσότητα: {row['quantity']}kg | Υγρ: {row['moisture']}%")
+                        rev = row.get('revenue', 0)
+                        prc = row.get('price', 0)
+                        
+                        c_txt, c_money = st.columns([3, 1])
+                        c_txt.markdown(f"**{row['name']}** - {row['variety']} ({row['date']})")
+                        c_txt.caption(f"Ποσότητα: {row['quantity']}kg | Τιμή: {prc} €/kg")
+                        
+                        c_money.metric("Έσοδο", f"{rev:.2f} €")
                         st.markdown("---")
 
     # --------------------------------------------------
-    # 3. ΚΑΙΡΟΣ & TOOLS
+    # 3. ΚΑΙΡΟΣ
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & EffiSpray":
-        
         st.header("🌦️ Πρόγνωση Καιρού")
-        
         col_search, col_btn = st.columns([3, 1])
         user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής", value="Larissa")
         
@@ -303,10 +322,8 @@ else:
 
                 if "results" in geo_res:
                     data = geo_res['results'][0]
-                    lat = data['latitude']
-                    lon = data['longitude']
-                    name = data['name']
-                    country = data.get("country", "")
+                    lat, lon = data['latitude'], data['longitude']
+                    name, country = data['name'], data.get("country", "")
 
                     st.success(f"📍 Βρέθηκε: **{name}, {country}**")
 
