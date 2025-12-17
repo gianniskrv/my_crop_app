@@ -9,7 +9,6 @@ from datetime import date
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # --- 2. ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (GREEK CROPS) ---
-# Προστέθηκε το 'wiki_term' για σωστή αναζήτηση στη Wikipedia
 default_crops = [
     {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum", "wiki_term": "Βαμβάκι (φυτό)"},
     {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum", "wiki_term": "Σίτος"},
@@ -181,10 +180,11 @@ elif menu_choice == "☁️ Καιρός & EffiSpray":
             loc_data = geo_response['results'][0]
             lat, lon = loc_data['latitude'], loc_data['longitude']
             
-
-weather_url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            weather_url = (
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
-                "&timezone=auto")
+                "&timezone=auto"
+            )
             w_res = requests.get(weather_url).json()
             curr = w_res['current']
             
