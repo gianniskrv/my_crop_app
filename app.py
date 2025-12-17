@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import wikipedia
 import streamlit.components.v1 as components
-from datetime import date
+from datetime import date, datetime
 import time
 import smtplib
 import ssl
@@ -21,7 +21,7 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ ADMIN (Μόνο εσύ)
+# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ ADMIN
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "admin", 
@@ -33,6 +33,13 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
+
+# --- ΑΡΧΙΚΟΠΟΙΗΣΗ ΙΣΤΟΡΙΚΟΥ & ΜΗΝΥΜΑΤΩΝ ---
+if 'history_log' not in st.session_state:
+    st.session_state.history_log = []
+
+if 'support_messages' not in st.session_state:
+    st.session_state.support_messages = []
 
 # ==============================================================================
 # 🎨 ΑΣΦΑΛΕΙΑ & ΑΠΟΚΡΥΨΗ MENU
@@ -46,7 +53,6 @@ hide_streamlit_style = """
             </style>
             """
 
-# ΛΟΓΙΚΗ: Αν ΔΕΝ είναι Admin -> ΚΡΥΨΕ ΤΑ ΠΑΝΤΑ (Menu, Footer, Manage App)
 if not st.session_state.authenticated:
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 else:
@@ -71,7 +77,6 @@ def send_email_notification(receiver_email, subject, body):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
             smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
             smtp.send_message(msg)
-        st.toast(f"✅ Εστάλη email επιβεβαίωσης στο {receiver_email}!", icon="📩")
     except Exception as e:
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
 
@@ -145,11 +150,17 @@ else:
         user_role = st.session_state.current_user['role']
         st.info(f"👤 **{st.session_state.current_user['name']}**")
         
-        menu_options = ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"]
+        # --- ΜΕΝΟΥ ---
+        menu_options = [
+            "📝 Νέα Καταγραφή", 
+            "🗂️ Βιβλιοθήκη & Οικονομικά", 
+            "☁️ Καιρός & EffiSpray",
+            "🆘 Βοήθεια & Υποστήριξη"
+        ]
         
-        # 🛡️ ΑΠΟΚΛΕΙΣΤΙΚΗ ΠΡΟΣΒΑΣΗ: Η επιλογή εμφανίζεται ΜΟΝΟ αν είσαι admin
         if user_role == 'admin':
             st.warning("🔧 Admin Mode: Enabled")
+            menu_options.append("📨 Εισερχόμενα Μηνύματα")
             menu_options.append("👥 Διαχείριση Χρηστών")
             
         if st.button("🚪 Αποσύνδεση"):
@@ -172,9 +183,6 @@ else:
         {"name": "Πατάτα", "category": "Κηπευτικά", "wiki_term": "Πατάτα"},
         {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "wiki_term": "Άμπελος"},
     ]
-
-    if 'history_log' not in st.session_state:
-        st.session_state.history_log = []
 
     st.title("🌱 Agricultural Management System")
 
@@ -370,17 +378,90 @@ else:
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     # --------------------------------------------------
-    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY - DOUBLE CHECK)
+    # 5. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ (ΕΝΗΜΕΡΩΜΕΝΟ)
+    # --------------------------------------------------
+    elif menu_choice == "🆘 Βοήθεια & Υποστήριξη":
+        st.header("🆘 Κέντρο Υποστήριξης")
+        st.write("Συμπληρώστε την παρακάτω φόρμα για να επικοινωνήσετε απευθείας με τον διαχειριστή.")
+        
+        with st.form("support_form"):
+            # --- ΝΕΟ ΥΠΟΧΡΕΩΤΙΚΟ ΠΕΔΙΟ EMAIL ---
+            # Προ-συμπληρώνει το email αν υπάρχει στον λογαριασμό, αλλά ο χρήστης μπορεί να το αλλάξει
+            default_email = st.session_state.current_user.get('email', '')
+            sender_email = st.text_input("Το Email σας (για να λάβετε απάντηση) *", value=default_email)
+            
+            subject = st.text_input("Θέμα Μηνύματος *", placeholder="π.χ. Πρόβλημα με την εγγραφή...")
+            msg_body = st.text_area("Το μήνυμά σας *", placeholder="Γράψτε εδώ λεπτομέρειες...")
+            
+            submit_support = st.form_submit_button("📨 Αποστολή Μηνύματος")
+            
+            if submit_support:
+                if subject and msg_body and sender_email:
+                    # Αποθήκευση
+                    msg_entry = {
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "user": st.session_state.current_user['name'],
+                        "email": sender_email, # Κρατάμε το email που δήλωσε τώρα
+                        "subject": subject,
+                        "message": msg_body
+                    }
+                    st.session_state.support_messages.append(msg_entry)
+                    
+                    # Αποστολή Email στον Admin
+                    admin_email = "johnkrv1@gmail.com"
+                    email_subj_formatted = f"🔔 AgroManager Support: {subject}"
+                    email_body_formatted = (
+                        f"Νέο μήνυμα υποστήριξης από τον χρήστη: {st.session_state.current_user['name']}\n"
+                        f"Email Επικοινωνίας Χρήστη: {sender_email}\n\n" # ΕΔΩ ΤΟ ΒΛΕΠΕΙΣ ΞΕΚΑΘΑΡΑ
+                        f"Θέμα: {subject}\n"
+                        f"------------------------------------------------\n"
+                        f"{msg_body}\n"
+                        f"------------------------------------------------\n"
+                        f"Μπορείτε να απαντήσετε απευθείας σε αυτό το email: {sender_email}"
+                    )
+                    send_email_notification(admin_email, email_subj_formatted, email_body_formatted)
+                    
+                    st.success("Το μήνυμά σας εστάλη επιτυχώς! Ο διαχειριστής θα επικοινωνήσει μαζί σας.")
+                else:
+                    st.error("⚠️ Παρακαλώ συμπληρώστε όλα τα πεδία, συμπεριλαμβανομένου του Email.")
+
+    # --------------------------------------------------
+    # 6. ΕΙΣΕΡΧΟΜΕΝΑ ΜΗΝΥΜΑΤΑ (ADMIN ONLY)
+    # --------------------------------------------------
+    elif menu_choice == "📨 Εισερχόμενα Μηνύματα":
+         if st.session_state.current_user['role'] != 'admin':
+             st.stop()
+             
+         st.header("📨 Εισερχόμενα Μηνύματα Χρηστών")
+         
+         if not st.session_state.support_messages:
+             st.info("Δεν υπάρχουν νέα μηνύματα.")
+         else:
+             msg_df = pd.DataFrame(st.session_state.support_messages)
+             msg_df = msg_df.iloc[::-1]
+             
+             st.dataframe(
+                 msg_df,
+                 column_config={
+                     "timestamp": "Ημερομηνία",
+                     "user": "Χρήστης",
+                     "email": "Email Απάντησης",
+                     "subject": "Θέμα",
+                     "message": "Μήνυμα"
+                 },
+                 use_container_width=True,
+                 hide_index=True
+             )
+
+    # --------------------------------------------------
+    # 7. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY)
     # --------------------------------------------------
     elif menu_choice == "👥 Διαχείριση Χρηστών":
-        # ⚠️ ΔΙΠΛΟΣ ΕΛΕΓΧΟΣ ΑΣΦΑΛΕΙΑΣ
-        # Αν κάποιος δεν είναι Admin και προσπαθήσει να μπει εδώ, το πρόγραμμα σταματάει.
         if st.session_state.current_user['role'] != 'admin':
-             st.error("⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ Η ΠΡΟΣΒΑΣΗ. Αυτή η σελίδα είναι μόνο για διαχειριστές.")
              st.stop()
         
         st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin)")
-        st.caption("Διαχείριση εγγεγραμμένων χρηστών. Πατήστε το 👁️ για να δείτε τον κωδικό.")
+        st.caption("Διαχείριση εγγεγραμμένων χρηστών.")
         
         h1, h2, h3, h4, h5 = st.columns([2, 2, 2, 2, 1])
         h1.markdown("**Username**")
