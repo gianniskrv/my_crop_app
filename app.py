@@ -35,18 +35,15 @@ def send_email_notification(receiver_email, subject, body):
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
 
 # ==============================================================================
-# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (FORCE ADMIN UPDATE)
+# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ
 # ==============================================================================
 
-# Αρχικοποίηση βάσης χρηστών αν δεν υπάρχει
 if 'users_db' not in st.session_state:
     st.session_state.users_db = {
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# --- ΕΔΩ ΕΙΝΑΙ Η ΔΙΟΡΘΩΣΗ ---
-# Κάθε φορά που τρέχει η εφαρμογή, ΕΠΙΒΑΛΛΟΥΜΕ τα δικαιώματα Admin στον λογαριασμό σου
-# Έτσι δεν θα χαθεί ποτέ, ό,τι και να γίνει στη μνήμη του Streamlit.
+# Force Admin Update (για να είσαι πάντα Admin)
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "admin", 
@@ -59,7 +56,7 @@ if 'authenticated' not in st.session_state:
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# --- ΣΥΝΑΡΤΗΣΕΙΣ LOGIN ---
+# --- LOGIN FUNCTIONS ---
 def login_user(username, password):
     if username in st.session_state.users_db:
         if st.session_state.users_db[username]['password'] == password:
@@ -129,15 +126,19 @@ else:
         user_role = st.session_state.current_user['role']
         st.info(f"👤 **{st.session_state.current_user['name']}**")
         
-        # Εμφάνιση Admin Badge
+        # Λίστα επιλογών μενού
+        menu_options = ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"]
+        
+        # ΑΝ ΕΙΣΑΙ ADMIN, ΠΡΟΣΘΕΤΟΥΜΕ ΤΗΝ ΕΠΙΛΟΓΗ ΔΙΑΧΕΙΡΙΣΗΣ
         if user_role == 'admin':
             st.warning("🔧 Admin Mode: Enabled")
+            menu_options.append("👥 Διαχείριση Χρηστών") # <--- ΝΕΟ
             
         if st.button("🚪 Αποσύνδεση"):
             logout()
         st.divider()
         st.title("Μενού")
-        menu_choice = st.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"])
+        menu_choice = st.radio("Πλοήγηση", menu_options)
 
     # --- DB ---
     default_crops = [
@@ -349,3 +350,27 @@ else:
         st.divider()
         st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
         components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
+
+    # --------------------------------------------------
+    # 4. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ΜΟΝΟ ΓΙΑ ADMIN)
+    # --------------------------------------------------
+    elif menu_choice == "👥 Διαχείριση Χρηστών":
+        st.header("👥 Πίνακας Ελέγχου Χρηστών (Admin Only)")
+        st.info("Εδώ βλέπετε όλους τους λογαριασμούς που έχουν δημιουργηθεί στην πλατφόρμα.")
+        
+        # Μετατροπή της βάσης δεδομένων σε πίνακα
+        # Η users_db είναι λεξικό, το κάνουμε λίστα για να φαίνεται ωραία
+        users_list = []
+        for uname, udata in st.session_state.users_db.items():
+            users_list.append({
+                "Username": uname,
+                "Ονοματεπώνυμο": udata['name'],
+                "Email": udata.get('email', '-'),
+                "Ρόλος": udata['role'],
+                "Κωδικός": udata['password'] # Εμφανίζεται γιατί είσαι Admin
+            })
+        
+        users_df = pd.DataFrame(users_list)
+        st.dataframe(users_df, use_container_width=True)
+        
+        st.write(f"**Σύνολο εγγεγραμμένων χρηστών:** {len(users_list)}")
