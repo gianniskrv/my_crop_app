@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import requests
 import wikipedia
 import streamlit.components.v1 as components
 from datetime import date
@@ -28,7 +29,7 @@ if 'history_log' not in st.session_state:
 
 # --- 4. ΠΛΕΥΡΙΚΟ ΜΕΝΟΥ ---
 st.sidebar.title("Μενού")
-menu_choice = st.sidebar.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Ιστορικό", "🇬🇷 Meteo.gr & Εργαλεία"])
+menu_choice = st.sidebar.radio("Πλοήγηση", ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Ιστορικό", "☁️ Καιρός & EffiSpray"])
 
 # --- 5. ΚΥΡΙΟ ΠΡΟΓΡΑΜΜΑ ---
 st.title("🌱 Agricultural Management System")
@@ -141,18 +142,60 @@ elif menu_choice == "🗂️ Βιβλιοθήκη & Ιστορικό":
                     st.markdown("---")
 
 # ==================================================
-# ΣΕΛΙΔΑ 3: METEO.GR & TOOLS
+# ΣΕΛΙΔΑ 3: ΚΑΙΡΟΣ (ΜΕ SEARCH BAR) & EFFISPRAY
 # ==================================================
-elif menu_choice == "🇬🇷 Meteo.gr & Εργαλεία":
+elif menu_choice == "☁️ Καιρός & EffiSpray":
     
-    st.header("🌦️ Ζωντανή Εικόνα Καιρού (Meteo.gr)")
-    st.write("Παρακολουθήστε ζωντανά τις συνθήκες από το δίκτυο του Εθνικού Αστεροσκοπείου Αθηνών.")
+    st.header("🌦️ Πρόγνωση Καιρού")
     
-    # Ενσωμάτωση του Meteo Maps (Λειτουργεί πάντα και δεν βγάζει error)
-    # Χρησιμοποιούμε iframe για να φέρουμε το site μέσα στην εφαρμογή μας
-    components.iframe("https://www.meteo.gr/meteomaps/", height=700, scrolling=True)
+    # --- ΜΠΑΡΑ ΑΝΑΖΗΤΗΣΗΣ ---
+    col_search, col_btn = st.columns([3, 1])
+    # O χρήστης γράφει εδώ την πόλη
+    user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής (π.χ. Larissa, Karditsa, Athens)", value="Larissa")
+    
+    # Ξεκινάμε τη διαδικασία αναζήτησης
+    if user_city:
+        try:
+            # Βήμα 1: Βρες τις συντεταγμένες (Geocoding)
+            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={user_city}&count=1&language=el&format=json"
+            geo_res = requests.get(geo_url).json()
+
+            if "results" in geo_res:
+                data = geo_res['results'][0]
+                lat = data['latitude']
+                lon = data['longitude']
+                name = data['name']
+                country = data.get("country", "")
+
+                st.success(f"📍 Βρέθηκε: **{name}, {country}**")
+
+                # Βήμα 2: Φέρε τον καιρό (Weather API)
+                weather_url = (
+                    f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                    "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+                    "&timezone=auto"
+                )
+                w_res = requests.get(weather_url).json()
+                curr = w_res['current']
+
+                # Εμφάνιση μετρήσεων
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("🌡️ Θερμοκρασία", f"{curr['temperature_2m']} °C")
+                c2.metric("💧 Υγρασία", f"{curr['relative_humidity_2m']} %")
+                c3.metric("☔ Βροχή", f"{curr['precipitation']} mm")
+                c4.metric("💨 Άνεμος", f"{curr['wind_speed_10m']} km/h")
+                
+                # Εμφάνιση χάρτη με πινέζα
+                map_data = pd.DataFrame({'lat': [lat], 'lon': [lon]})
+                st.map(map_data)
+                
+            else:
+                st.warning("Η πόλη δεν βρέθηκε. Δοκίμασε με Λατινικούς χαρακτήρες (π.χ. Athens).")
+
+        except Exception as e:
+            st.error("Υπήρξε πρόβλημα με τη σύνδεση.")
+            # st.write(e) # Ξεκλείδωσέ το αν θες να δεις το τεχνικό λάθος
 
     st.divider()
-    st.header("🚜 EffiSpray")
-    st.write("Υπολογισμός ψεκασμού")
+    st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
     components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
