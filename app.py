@@ -7,29 +7,25 @@ from datetime import date, datetime
 import time
 import smtplib
 import ssl
+import random  # <--- Χρειάζεται για τον τυχαίο κωδικό επαναφοράς
 from email.message import EmailMessage
 
 # --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 🎨 UI & DESIGN (CSS STYLING) - Η ΑΙΣΘΗΤΙΚΗ ΑΝΑΒΑΘΜΙΣΗ
+# 🎨 UI & DESIGN (CSS STYLING)
 # ==============================================================================
 def local_css():
     st.markdown("""
     <style>
-        /* 1. Αλλαγή Φόντου σε απαλό Πράσινο-Γαλάζιο Gradient */
         .stApp {
             background-image: linear-gradient(to bottom right, #ebf7eb, #e3f2fd);
         }
-
-        /* 2. Στυλ για το Sidebar (Πιο σκούρο για αντίθεση) */
         [data-testid="stSidebar"] {
             background-image: linear-gradient(180deg, #f1f8e9, #ffffff);
             border-right: 1px solid #c8e6c9;
         }
-
-        /* 3. Στυλ για τα Κουμπιά (Πράσινα και Στρογγυλεμένα) */
         .stButton>button {
             color: white;
             background-color: #2e7d32;
@@ -41,28 +37,22 @@ def local_css():
             background-color: #1b5e20;
             transform: scale(1.02);
         }
-
-        /* 4. Στυλ για τα Inputs (Άσπρο φόντο για να ξεχωρίζουν) */
         .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
             background-color: #ffffff;
             border-radius: 8px;
             border: 1px solid #a5d6a7;
         }
-
-        /* 5. Απόκρυψη Streamlit Branding (για Admin/Users) */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
         .stDeployButton {display:none;}
-        
     </style>
     """, unsafe_allow_html=True)
 
-# Εφαρμογή του CSS
 local_css()
 
 # ==============================================================================
-# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ & SESSION STATE
+# 👤 SESSION STATE & USERS
 # ==============================================================================
 
 if 'users_db' not in st.session_state:
@@ -70,7 +60,7 @@ if 'users_db' not in st.session_state:
         "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
     }
 
-# ΕΠΙΒΟΛΗ ΔΙΚΑΙΩΜΑΤΩΝ OWNER
+# OWNER
 st.session_state.users_db["GiannisKrv"] = {
     "password": "21041414", 
     "role": "owner", 
@@ -78,21 +68,23 @@ st.session_state.users_db["GiannisKrv"] = {
     "email": "johnkrv1@gmail.com" 
 }
 
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'current_user' not in st.session_state:
-    st.session_state.current_user = None
+if 'authenticated' not in st.session_state: st.session_state.authenticated = False
+if 'current_user' not in st.session_state: st.session_state.current_user = None
 
-# --- ΑΡΧΙΚΟΠΟΙΗΣΗ DB ---
-if 'history_log' not in st.session_state:
-    st.session_state.history_log = [] # ΕΣΟΔΑ
-if 'expenses_log' not in st.session_state:
-    st.session_state.expenses_log = [] # ΕΞΟΔΑ
-if 'support_messages' not in st.session_state:
-    st.session_state.support_messages = [] # ΜΗΝΥΜΑΤΑ
+# --- STATE ΓΙΑ PASSWORD RESET ---
+if 'reset_mode' not in st.session_state: st.session_state.reset_mode = False
+if 'reset_step' not in st.session_state: st.session_state.reset_step = 1 # 1: Email, 2: Code
+if 'reset_otp' not in st.session_state: st.session_state.reset_otp = None
+if 'reset_email_target' not in st.session_state: st.session_state.reset_email_target = None
+if 'reset_username_target' not in st.session_state: st.session_state.reset_username_target = None
+
+# --- STATE ΓΙΑ DATA ---
+if 'history_log' not in st.session_state: st.session_state.history_log = []
+if 'expenses_log' not in st.session_state: st.session_state.expenses_log = []
+if 'support_messages' not in st.session_state: st.session_state.support_messages = []
 
 # ==============================================================================
-# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
+# 📧 EMAIL FUNCTIONS
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
 EMAIL_PASSWORD = "kcsq wuoi wnik xzko"
@@ -109,14 +101,16 @@ def send_email_notification(receiver_email, subject, body):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
             smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
             smtp.send_message(msg)
+        return True
     except Exception as e:
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
+        return False
 
-# --- HELPER: CONVERT DF TO CSV ---
+# --- HELPER: CSV ---
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8-sig')
 
-# --- LOGIN FUNCTIONS ---
+# --- AUTH FUNCTIONS ---
 def login_user(username, password):
     if username in st.session_state.users_db:
         if st.session_state.users_db[username]['password'] == password:
@@ -135,15 +129,10 @@ def register_user(new_user, new_pass, new_name, new_email):
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
         st.session_state.users_db[new_user] = {
-            "password": new_pass, 
-            "role": "user", 
-            "name": new_name,
-            "email": new_email 
+            "password": new_pass, "role": "user", "name": new_name, "email": new_email 
         }
-        st.success("Ο λογαριασμός δημιουργήθηκε! Τώρα μπορείτε να συνδεθείτε.")
-        
-        body = f"Γεια σου {new_name},\n\nΚαλωσήρθες στο AgroManager Pro!\nΟ λογαριασμός σου ενεργοποιήθηκε επιτυχώς."
-        send_email_notification(new_email, "Καλωσήρισες στο AgroManager", body)
+        st.success("Επιτυχία! Συνδεθείτε.")
+        send_email_notification(new_email, "Καλωσήρισες στο AgroManager", f"Γεια σου {new_name},\nΟ λογαριασμός σου ενεργοποιήθηκε.")
 
 def logout():
     st.session_state.authenticated = False
@@ -151,35 +140,115 @@ def logout():
     st.rerun()
 
 # ==================================================
-# 🔐 ΟΘΟΝΗ ΕΙΣΟΔΟΥ
+# 🔐 LOGIC: LOGIN vs RESET PASSWORD
 # ==================================================
 if not st.session_state.authenticated:
-    st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🔐 AgroManager Login</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🔐 AgroManager Pro</h1>", unsafe_allow_html=True)
     
-    # Κεντράρισμα Login Form
     col_spacer1, col_login, col_spacer2 = st.columns([1, 2, 1])
     
     with col_login:
-        tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
         
-        with tab1:
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Είσοδος", use_container_width=True):
-                login_user(username, password)
-                
-        with tab2:
-            st.write("Δημιουργήστε νέο λογαριασμό:")
-            new_user = st.text_input("Επιθυμητό Username")
-            new_pass = st.text_input("Επιθυμητό Password", type="password")
-            new_name = st.text_input("Ονοματεπώνυμο")
-            new_email = st.text_input("Email (για ειδοποιήσεις)")
+        # --- 1. ΟΘΟΝΗ RESET PASSWORD ---
+        if st.session_state.reset_mode:
+            st.markdown("### 🔄 Ανάκτηση Κωδικού")
+            st.info("Διαδικασία αλλαγής κωδικού μέσω Email.")
             
-            if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
-                if new_user and new_pass and new_name and new_email:
-                    register_user(new_user, new_pass, new_name, new_email)
-                else:
-                    st.warning("Συμπληρώστε όλα τα πεδία.")
+            # BΗΜΑ 1: Εισαγωγή Email
+            if st.session_state.reset_step == 1:
+                email_input = st.text_input("Εισάγετε το Email σας:")
+                
+                col_r1, col_r2 = st.columns(2)
+                if col_r1.button("Αποστολή Κωδικού", use_container_width=True):
+                    # Ψάχνουμε αν υπάρχει το email στη βάση
+                    found_user = None
+                    for uname, udata in st.session_state.users_db.items():
+                        if udata.get('email') == email_input:
+                            found_user = uname
+                            break
+                    
+                    if found_user:
+                        # Γεννιέται 6ψήφιος κωδικός
+                        otp = str(random.randint(100000, 999999))
+                        st.session_state.reset_otp = otp
+                        st.session_state.reset_email_target = email_input
+                        st.session_state.reset_username_target = found_user
+                        
+                        # Αποστολή Email
+                        body = f"Ο κωδικός επιβεβαίωσης για αλλαγή κωδικού είναι: {otp}\n\nΑν δεν το ζητήσατε εσείς, αγνοήστε το."
+                        sent = send_email_notification(email_input, "🔑 Κωδικός Επαναφοράς - AgroManager", body)
+                        
+                        if sent:
+                            st.session_state.reset_step = 2
+                            st.toast("Ο κωδικός εστάλη στο email σας!", icon="📧")
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.error("Δεν βρέθηκε χρήστης με αυτό το email.")
+
+                if col_r2.button("Πίσω", use_container_width=True):
+                    st.session_state.reset_mode = False
+                    st.rerun()
+
+            # ΒΗΜΑ 2: Επιβεβαίωση & Αλλαγή
+            elif st.session_state.reset_step == 2:
+                st.write(f"Στείλαμε έναν κωδικό στο: **{st.session_state.reset_email_target}**")
+                
+                code_input = st.text_input("Εισάγετε τον 6ψήφιο κωδικό:")
+                new_password = st.text_input("Νέος Κωδικός:", type="password")
+                
+                if st.button("💾 Αλλαγή Κωδικού", use_container_width=True):
+                    if code_input == st.session_state.reset_otp:
+                        if new_password:
+                            # Αλλαγή στη βάση
+                            uname = st.session_state.reset_username_target
+                            st.session_state.users_db[uname]['password'] = new_password
+                            
+                            st.success("Ο κωδικός άλλαξε επιτυχώς! Τώρα συνδεθείτε.")
+                            # Reset States
+                            st.session_state.reset_mode = False
+                            st.session_state.reset_step = 1
+                            st.session_state.reset_otp = None
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.warning("Παρακαλώ δώστε νέο κωδικό.")
+                    else:
+                        st.error("Λάθος κωδικός επιβεβαίωσης.")
+                        
+                if st.button("Ακύρωση"):
+                    st.session_state.reset_mode = False
+                    st.session_state.reset_step = 1
+                    st.rerun()
+
+        # --- 2. ΟΘΟΝΗ LOGIN / REGISTER (ΚΑΝΟΝΙΚΗ) ---
+        else:
+            tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
+            
+            with tab1:
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                if st.button("Είσοδος", use_container_width=True):
+                    login_user(username, password)
+                
+                st.markdown("---")
+                # Κουμπί για Ξέχασα τον κωδικό
+                if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True):
+                    st.session_state.reset_mode = True
+                    st.rerun()
+                    
+            with tab2:
+                st.write("Δημιουργήστε νέο λογαριασμό:")
+                new_user = st.text_input("Επιθυμητό Username")
+                new_pass = st.text_input("Επιθυμητό Password", type="password")
+                new_name = st.text_input("Ονοματεπώνυμο")
+                new_email = st.text_input("Email (για ειδοποιήσεις)")
+                
+                if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
+                    if new_user and new_pass and new_name and new_email:
+                        register_user(new_user, new_pass, new_name, new_email)
+                    else:
+                        st.warning("Συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
@@ -419,7 +488,7 @@ else:
                     c_ex2.info("Χωρίς έξοδα.")
 
     # --------------------------------------------------
-    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (GDD & VRT)
+    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & Γεωργία Ακριβείας":
         st.header("🌦️ Καιρός & Γεωργία Ακριβείας")
