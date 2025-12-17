@@ -182,11 +182,9 @@ elif menu_choice == "☁️ Καιρός & EffiSpray":
             lat, lon = loc_data['latitude'], loc_data['longitude']
             
 
-weather_url = (
-                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+weather_url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
-                "&timezone=auto"
-            )
+                "&timezone=auto")
             w_res = requests.get(weather_url).json()
             curr = w_res['current']
             
