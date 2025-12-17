@@ -13,9 +13,31 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 🎨 ΑΠΟΚΡΥΨΗ MENU & MANAGE APP (CSS)
+# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ & SESSION STATE
 # ==============================================================================
-# Αυτό το κομμάτι κρύβει το κουμπί Manage App, το μενού και το footer
+
+if 'users_db' not in st.session_state:
+    st.session_state.users_db = {
+        "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
+    }
+
+# Force Admin Update (για να είσαι πάντα Admin)
+st.session_state.users_db["GiannisKrv"] = {
+    "password": "21041414", 
+    "role": "admin", 
+    "name": "Γιάννης", 
+    "email": "johnkrv1@gmail.com" 
+}
+
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+
+# ==============================================================================
+# 🎨 ΑΣΦΑΛΕΙΑ & ΑΠΟΚΡΥΨΗ MENU (ΕΞΥΠΝΗ ΔΙΑΧΕΙΡΙΣΗ)
+# ==============================================================================
+# Αυτός ο κώδικας CSS κρύβει το Menu και το Manage App
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -24,7 +46,18 @@ hide_streamlit_style = """
             .stDeployButton {display:none;}
             </style>
             """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# ΛΟΓΙΚΗ ΑΣΦΑΛΕΙΑΣ:
+# 1. Αν ΔΕΝ έχει συνδεθεί κανείς -> ΚΡΥΦΤΑ ΟΛΑ
+# 2. Αν συνδεθεί ΑΠΛΟΣ ΧΡΗΣΤΗΣ -> ΚΡΥΦΤΑ ΟΛΑ
+# 3. Αν συνδεθεί ο ADMIN (Εσύ) -> ΜΗΝ ΚΡΥΒΕΙΣ ΤΙΠΟΤΑ (για να έχεις τον έλεγχο)
+
+if not st.session_state.authenticated:
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+else:
+    # Αν είναι συνδεδεμένος, ελέγχουμε τον ρόλο
+    if st.session_state.current_user['role'] != 'admin':
+        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==============================================================================
 # 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
@@ -47,28 +80,6 @@ def send_email_notification(receiver_email, subject, body):
         st.toast(f"✅ Εστάλη email επιβεβαίωσης στο {receiver_email}!", icon="📩")
     except Exception as e:
         st.error(f"Απέτυχε η αποστολή email. Error: {e}")
-
-# ==============================================================================
-# 👤 ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ
-# ==============================================================================
-
-if 'users_db' not in st.session_state:
-    st.session_state.users_db = {
-        "user": {"password": "123", "role": "user", "name": "Επισκέπτης", "email": "user@example.com"}
-    }
-
-# Force Admin Update
-st.session_state.users_db["GiannisKrv"] = {
-    "password": "21041414", 
-    "role": "admin", 
-    "name": "Γιάννης", 
-    "email": "johnkrv1@gmail.com" 
-}
-
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'current_user' not in st.session_state:
-    st.session_state.current_user = None
 
 # --- LOGIN FUNCTIONS ---
 def login_user(username, password):
@@ -142,6 +153,7 @@ else:
         
         menu_options = ["📝 Νέα Καταγραφή", "🗂️ Βιβλιοθήκη & Οικονομικά", "☁️ Καιρός & EffiSpray"]
         
+        # Αν είσαι ADMIN: Βλέπεις Admin Mode και Διαχείριση
         if user_role == 'admin':
             st.warning("🔧 Admin Mode: Enabled")
             menu_options.append("👥 Διαχείριση Χρηστών")
@@ -385,7 +397,6 @@ else:
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
             
-            # ΜΑΤΑΚΙ ΓΙΑ ΚΩΔΙΚΟ
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state:
                 st.session_state[toggle_key] = False
