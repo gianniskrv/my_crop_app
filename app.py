@@ -174,29 +174,30 @@ import streamlit.components.v1 as components # Για να βάλουμε το E
 st.divider()
 st.subheader("🌦️ Καιρικές Συνθήκες & Ψεκασμοί")
 
-# 1. ΛΗΨΗ ΔΕΔΟΜΕΝΩΝ ΚΑΙΡΟΥ (Open-Meteo - Δωρεάν & Αξιόπιστο)
-# Έβαλα συντεταγμένες Λάρισας (μιας και είδα ότι είσαι κοντά).
-# Μπορείς να τις αλλάξεις για το χωράφι σου.
+# Συντεταγμένες
 LAT = 39.639
 LON = 22.419
 
 try:
-    # Ζητάμε θερμοκρασία (2m), υγρασία και ταχύτητα ανέμου
+    # Προσοχή: Όλα εδώ μέσα είναι στοιχισμένα (έχουν ένα Tab μπροστά)
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m"
     response = requests.get(url)
     data = response.json()
-current = data['current_weather']    
-    # Εμφάνιση σε ωραία κουτάκια (Metrics)
+    
+    current = data['current_weather']
+    
     col1, col2, col3 = st.columns(3)
     col1.metric("Θερμοκρασία", f"{current['temperature']} °C")
     col2.metric("Ταχύτητα Ανέμου", f"{current['windspeed']} km/h")
-    # Η υγρασία είναι λίγο πιο σύνθετη στο OpenMeteo, παίρνουμε την τρέχουσα ώρα περίπου
-    # Για απλότητα εδώ βάζω μια ένδειξη, αλλά κανονικά θέλει αντιστοίχιση ώρας
     col3.info("Δεδομένα από Open-Meteo") 
 
 except Exception as e:
+    # Το except πρέπει να είναι στην ίδια ευθεία με το try (τέρμα αριστερά)
     st.error("Δεν ήταν δυνατή η λήψη καιρικών δεδομένων.")
 
+# Το iframe είναι εκτός try/except, τέρμα αριστερά
+st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
+components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 # 2. ΕΝΣΩΜΑΤΩΣΗ EFFISPRAY (IFRAME)
 st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
 st.caption("Πλοηγήσου στον χάρτη απευθείας από εδώ:")
