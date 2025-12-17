@@ -14,7 +14,7 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 🎨 UI & DESIGN (CSS STYLING) - ΔΙΟΡΘΩΣΗ ΓΙΑ MOBILE MENU
+# 🎨 UI & DESIGN (CSS STYLING)
 # ==============================================================================
 def local_css():
     st.markdown("""
@@ -43,9 +43,7 @@ def local_css():
             border: 1px solid #a5d6a7;
         }
         
-        /* ΔΙΟΡΘΩΣΗ: Δεν κρύβουμε πλέον το header για να φαίνεται το βελάκι στο κινητό */
-        /* header {visibility: hidden;} <--- ΑΥΤΟ ΔΙΑΓΡΑΦΗΚΕ */
-        
+        /* Κρύβουμε μόνο τα περιττά, ΟΧΙ το header για να φαίνεται το μενού στο κινητό */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         .stDeployButton {display:none;}
@@ -147,7 +145,7 @@ def register_user(new_user, new_pass, new_name, new_email, new_phone):
             "email": new_email,
             "phone": new_phone
         }
-        st.success("Επιτυχία! Συνδεθείτε.")
+        st.success("Επιτυχία! Ο λογαριασμός δημιουργήθηκε. Τώρα μπορείτε να συνδεθείτε.")
         send_email_notification(new_email, "Καλωσήρισες στο AgroManager", f"Γεια σου {new_name},\nΟ λογαριασμός σου ενεργοποιήθηκε.")
 
 def logout():
@@ -216,27 +214,41 @@ if not st.session_state.authenticated:
                     st.rerun()
         else:
             tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
+            
+            # --- LOGIN FORM ---
             with tab1:
-                username = st.text_input("Username")
-                password = st.text_input("Password", type="password")
-                if st.button("Είσοδος", use_container_width=True):
-                    login_user(username, password)
+                with st.form("login_form"):
+                    username = st.text_input("Username")
+                    password = st.text_input("Password", type="password")
+                    submit_login = st.form_submit_button("Είσοδος", use_container_width=True)
+                    
+                    if submit_login:
+                        login_user(username, password)
+                
                 st.markdown("---")
                 if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True):
                     st.session_state.reset_mode = True
                     st.rerun()
+            
+            # --- REGISTER FORM (ΔΙΟΡΘΩΜΕΝΗ) ---
             with tab2:
-                st.write("Δημιουργήστε νέο λογαριασμό:")
-                new_user = st.text_input("Επιθυμητό Username")
-                new_pass = st.text_input("Επιθυμητό Password", type="password")
-                new_name = st.text_input("Ονοματεπώνυμο")
-                new_email = st.text_input("Email")
-                new_phone = st.text_input("Κινητό Τηλέφωνο")
-                if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
-                    if new_user and new_pass and new_name and new_email:
-                        register_user(new_user, new_pass, new_name, new_email, new_phone)
-                    else:
-                        st.warning("Συμπληρώστε όλα τα πεδία.")
+                # Χρησιμοποιούμε st.form για να μην χάνονται τα δεδομένα
+                with st.form("register_form", clear_on_submit=False):
+                    st.write("Δημιουργήστε νέο λογαριασμό:")
+                    new_user = st.text_input("Επιθυμητό Username")
+                    new_pass = st.text_input("Επιθυμητό Password", type="password")
+                    new_name = st.text_input("Ονοματεπώνυμο")
+                    new_email = st.text_input("Email")
+                    new_phone = st.text_input("Κινητό Τηλέφωνο")
+                    
+                    submit_register = st.form_submit_button("Δημιουργία Λογαριασμού", use_container_width=True)
+                    
+                    if submit_register:
+                        # Ελέγχουμε αν ΟΛΑ τα πεδία έχουν συμπληρωθεί
+                        if new_user and new_pass and new_name and new_email and new_phone:
+                            register_user(new_user, new_pass, new_name, new_email, new_phone)
+                        else:
+                            st.warning("Παρακαλώ συμπληρώστε ΟΛΑ τα πεδία.")
 
 else:
     # ==================================================
