@@ -1,206 +1,156 @@
 import streamlit as st
+import pandas as pd
+import requests
+import wikipedia
+import streamlit.components.v1 as components
 
-# Ορισμός της κλάσης Crop
-class Crop:
-    def __init__(self, name, quantity, soil_moisture):
-        self.name = name
-        self.quantity = quantity
-        self.soil_moisture = soil_moisture
+# --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
+st.set_page_config(page_title="AgroManager", page_icon="🌱", layout="wide")
 
-    def update_quantity(self, quantity):
-        self.quantity = quantity
-
-    def update_soil_moisture(self, moisture):
-        self.soil_moisture = moisture
-
-# Αρχικοποίηση λίστας (Session State) για να μην χάνονται τα δεδομένα
-if 'crops' not in st.session_state:
-    st.session_state.crops = []
-
-def main():
-    st.title("🌱 Agricultural Management System")
-    
-    # Μενού στην πλαϊνή μπάρα
-    menu = ["View Crops", "Add Crop", "Update Crop"]
-    choice = st.sidebar.selectbox("Menu", menu)
-
-    # --- 1. VIEW CROPS ---
-    if choice == "View Crops":
-        st.header("Current Crops")
-        if not st.session_state.crops:
-            st.info("No crops in the system yet.")
-        else:
-            # Εμφάνιση ως λίστα
-            for crop in st.session_state.crops:
-                st.success(f"**{crop.name}** | Qty: {crop.quantity} | Moisture: {crop.soil_moisture}%")
-
-    # --- 2. ADD CROP ---
-    elif choice == "Add Crop":
-        st.header("Add New Crop")
-        
-        # Φόρμα εισαγωγής
-        with st.form("add_crop_form"):
-            name = st.text_input("Crop Name")
-            quantity = st.number_input("Quantity", min_value=0, step=1)
-            moisture = st.number_input("Soil Moisture (%)", min_value=0.0, max_value=100.0, step=0.1)
-            
-            submitted = st.form_submit_button("Add Crop")
-            
-            if submitted:
-                if name:
-                    new_crop = Crop(name, quantity, moisture)
-                    st.session_state.crops.append(new_crop)
-                    st.success(f"Crop '{name}' added successfully!")
-                else:
-                    st.error("Please enter a crop name.")
-
-    # --- 3. UPDATE CROP ---
-    elif choice == "Update Crop":
-        st.header("Update Existing Crop")
-        
-        if not st.session_state.crops:
-            st.warning("No crops available to update.")
-        else:
-            # Λίστα με τα ονόματα των καλλιεργειών
-            crop_names = [crop.name for crop in st.session_state.crops]
-            selected_crop_name = st.selectbox("Select Crop to Update", crop_names)
-            
-            # Βρίσκουμε το αντικείμενο crop που επιλέχθηκε
-            selected_crop = next((c for c in st.session_state.crops if c.name == selected_crop_name), None)
-            
-            if selected_crop:
-                st.write(f"Current Quantity: {selected_crop.quantity}")
-                st.write(f"Current Moisture: {selected_crop.soil_moisture}%")
-                
-                new_qty = st.number_input("New Quantity", value=selected_crop.quantity, min_value=0)
-                new_moist = st.number_input("New Moisture (%)", value=selected_crop.soil_moisture, min_value=0.0, max_value=100.0)
-                
-                if st.button("Update Crop Details"):
-                    selected_crop.update_quantity(new_qty)
-                    selected_crop.update_soil_moisture(new_moist)
-                    st.success(f"Updated {selected_crop_name} successfully!")
-
-if __name__ == "__main__":
-    main()
-import streamlit as st
-import wikipedia  # Χρειάζεται εγκατάσταση: pip install wikipedia
-
-# 1. Η ΛΙΣΤΑ ΜΑΣ (Μπορείς να την έχεις και σε άλλο αρχείο)
+# --- 2. ΔΕΔΟΜΕΝΑ (GREEK CROPS DATABASE) ---
 greek_crops = [
-    {"name": "Βαμβάκι", "scientific_name": "Gossypium hirsutum", "category": "Βιομηχανικά"},
-    {"name": "Σιτάρι Σκληρό", "scientific_name": "Triticum durum", "category": "Σιτηρά"},
-    {"name": "Καλαμπόκι", "scientific_name": "Zea mays", "category": "Σιτηρά"},
-    {"name": "Ελιά (Λαδοελιά)", "scientific_name": "Olea europaea", "category": "Δέντρα"},
-    # ... πρόσθεσε τα υπόλοιπα εδώ ...
+    {"name": "Βαμβάκι", "category": "Βιομηχανικά", "scientific_name": "Gossypium hirsutum"},
+    {"name": "Σιτάρι Σκληρό", "category": "Σιτηρά", "scientific_name": "Triticum durum"},
+    {"name": "Καλαμπόκι", "category": "Σιτηρά", "scientific_name": "Zea mays"},
+    {"name": "Ηλίανθος", "category": "Βιομηχανικά", "scientific_name": "Helianthus annuus"},
+    {"name": "Ελιά (Λαδοελιά)", "category": "Δέντρα", "scientific_name": "Olea europaea"},
+    {"name": "Ελιά (Βρώσιμη)", "category": "Δέντρα", "scientific_name": "Olea europaea"},
+    {"name": "Πορτοκαλιά", "category": "Εσπεριδοειδή", "scientific_name": "Citrus sinensis"},
+    {"name": "Ροδακινιά", "category": "Πυρηνόκαρπα", "scientific_name": "Prunus persica"},
+    {"name": "Τομάτα", "category": "Κηπευτικά", "scientific_name": "Solanum lycopersicum"},
+    {"name": "Πατάτα", "category": "Κηπευτικά", "scientific_name": "Solanum tuberosum"},
+    {"name": "Αμπέλι (Οινοποιήσιμο)", "category": "Αμπέλι", "scientific_name": "Vitis vinifera"},
 ]
 
-st.title("Προσθήκη / Ενημέρωση Καλλιέργειας")
+# --- 3. INITIALIZE SESSION STATE (Μνήμη Εφαρμογής) ---
+# Εδώ αποθηκεύουμε τις καλλιέργειες που προσθέτει ο χρήστης
+if 'my_crops' not in st.session_state:
+    st.session_state.my_crops = []
 
-# 2. DROPDOWN ΑΠΟ ΤΗ ΛΙΣΤΑ
-# Φτιάχνουμε μια λίστα μόνο με τα ονόματα για το dropdown
-crop_names = [crop['name'] for crop in greek_crops]
+# --- 4. ΠΛΕΥΡΙΚΟ ΜΕΝΟΥ (SIDEBAR) ---
+st.sidebar.title("Menu")
+menu_choice = st.sidebar.selectbox("Πλοήγηση", ["Διαχείριση Καλλιεργειών", "Προβολή & Καιρός"])
 
-selected_crop_name = st.selectbox(
-    "Επίλεξε Καλλιέργεια (από τη βάση δεδομένων):",
-    options=crop_names
-)
+# --- 5. ΚΥΡΙΟ ΠΡΟΓΡΑΜΜΑ ---
+st.title("🌱 Agricultural Management System")
 
-# 3. ΑΥΤΟΜΑΤΗ ΑΝΑΚΤΗΣΗ ΣΤΟΙΧΕΙΩΝ
-# Βρίσκουμε ολόκληρο το αντικείμενο με βάση το όνομα που επέλεξε ο χρήστης
-selected_crop_data = next((item for item in greek_crops if item["name"] == selected_crop_name), None)
-
-if selected_crop_data:
-    st.markdown("### Στοιχεία Καλλιέργειας")
+# ==================================================
+# ΣΕΛΙΔΑ 1: ΔΙΑΧΕΙΡΙΣΗ (ADD/UPDATE)
+# ==================================================
+if menu_choice == "Διαχείριση Καλλιεργειών":
+    st.header("Ενημέρωση Παραγωγής")
     
-    # Εμφάνισε τα στοιχεία που έχουμε ήδη
-    col1, col2 = st.columns(2)
-    with col1:
-        st.text_input("Επιστημονικό Όνομα", value=selected_crop_data['scientific_name'], disabled=True)
-    with col2:
-        st.text_input("Κατηγορία", value=selected_crop_data['category'], disabled=True)
-
-    # 4. (ΠΡΟΑΙΡΕΤΙΚΑ) ΤΡΑΒΗΓΜΑ ΑΠΟ ΤΟ INTERNET (WIKIPEDIA)
-    # Αν θες να φέρεις κάτι live από το internet:
-    if st.button("🔍 Λήψη πληροφοριών από Wikipedia"):
-        try:
-            with st.spinner('Αναζήτηση στο διαδίκτυο...'):
-                wikipedia.set_lang("el") # Ορίζουμε Ελληνικά
-                # Ψάχνουμε τη σελίδα
-                page = wikipedia.page(selected_crop_name)
-                st.info(f"**Περιγραφή από Wikipedia:** {page.summary[0:300]}...") # Πρώτοι 300 χαρακτήρες
-                st.write(f"[Διάβασε περισσότερα]({page.url})")
-        except:
-            st.error("Δεν βρέθηκαν πληροφορίες στο διαδίκτυο για αυτή την καλλιέργεια.")
-
-# Εδώ συνεχίζει η φόρμα σου για Quantity / Moisture κλπ
-st.divider()
-st.subheader("Ενημέρωση Παραγωγής")
-new_qty = st.number_input("Ποσότητα (kg)", min_value=0)
-new_moisture = st.number_input("Υγρασία (%)", min_value=0.0, format="%.2f")
-
-if st.button("Save Crop"):
-    st.success(f"Αποθηκεύτηκε: {selected_crop_name} - {new_qty}kg")
-import pandas as pd # Βεβαιώσου ότι έχεις το import pandas στην αρχή
-
-# --- ΕΝΟΤΗΤΑ: ΣΤΑΤΙΣΤΙΚΑ (Με διόρθωση λαθών) ---
-st.divider()
-st.subheader("📊 Στατιστικά Καλλιεργειών")
-
-if 'crops' in st.session_state and st.session_state.crops:
-    # Δημιουργία DataFrame
-    df = pd.DataFrame(st.session_state.crops)
-
-    # 🛠️ ΑΣΦΑΛΕΙΑ: Ελέγχουμε αν λείπουν στήλες και τις δημιουργούμε
-    # Αυτό λύνει το StreamlitColumnNotFoundError
-    if 'quantity' not in df.columns:
-        df['quantity'] = 0
-    if 'moisture' not in df.columns:
-        df['moisture'] = 0.0
+    # Επιλογή από τη βάση δεδομένων
+    crop_names = [c['name'] for c in greek_crops]
+    selected_name = st.selectbox("Επίλεξε Καλλιέργεια:", crop_names)
+    
+    # Βρίσκουμε τα info της επιλογής
+    crop_info = next((item for item in greek_crops if item["name"] == selected_name), None)
+    
+    if crop_info:
+        # Εμφάνιση σταθερών πληροφοριών
+        col1, col2 = st.columns(2)
+        col1.text_input("Επιστημονικό Όνομα", crop_info['scientific_name'], disabled=True)
+        col2.text_input("Κατηγορία", crop_info['category'], disabled=True)
         
-    # Γεμίζουμε τυχόν κενά (NaN) με μηδενικά για να μην σκάσει το γράφημα
-    df['quantity'] = df['quantity'].fillna(0)
-    df['moisture'] = df['moisture'].fillna(0.0)
+        # Wikipedia Search
+        if st.checkbox("🔍 Πληροφορίες από Wikipedia"):
+            try:
+                with st.spinner('Αναζήτηση...'):
+                    wikipedia.set_lang("el")
+                    # Παίρνουμε μια σύνοψη 2 προτάσεων
+                    summary = wikipedia.summary(selected_name, sentences=2)
+                    st.info(f"📚 {summary}")
+            except:
+                st.warning("Δεν βρέθηκαν πληροφορίες στη Wikipedia για αυτό το φυτό.")
 
-    col1, col2 = st.columns(2)
+    st.divider()
+    st.subheader("Καταχώρηση Δεδομένων")
+    
+    # Φόρμα εισαγωγής τιμών
+    with st.form("crop_form"):
+        # Προεπιλεγμένες τιμές αν υπάρχει ήδη η καλλιέργεια
+        existing = next((item for item in st.session_state.my_crops if item['name'] == selected_name), None)
+        default_qty = existing['quantity'] if existing else 0
+        default_moist = existing['moisture'] if existing else 0.0
 
-    with col1:
-        st.caption("Ποσότητα (kg) ανά Καλλιέργεια")
-        st.bar_chart(df, x="name", y="quantity")
-
-    with col2:
-        st.caption("Επίπεδα Υγρασίας (%)")
-        st.line_chart(df, x="name", y="moisture")
+        new_qty = st.number_input("Ποσότητα Παραγωγής (kg)", min_value=0, value=default_qty, step=10)
+        new_moisture = st.number_input("Υγρασία (%)", min_value=0.0, max_value=100.0, value=float(default_moist), step=0.1)
         
-    total_qty = df['quantity'].sum()
-    st.metric("Συνολική Παραγωγή", f"{total_qty} kg")
+        submitted = st.form_submit_button("💾 Αποθήκευση / Ενημέρωση")
+        
+        if submitted:
+            # Λογική αποθήκευσης
+            if existing:
+                existing['quantity'] = new_qty
+                existing['moisture'] = new_moisture
+                st.success(f"Ενημερώθηκε επιτυχώς: {selected_name}")
+            else:
+                new_entry = {
+                    "name": selected_name,
+                    "quantity": new_qty,
+                    "moisture": new_moisture,
+                    "category": crop_info['category']
+                }
+                st.session_state.my_crops.append(new_entry)
+                st.success(f"Προστέθηκε επιτυχώς: {selected_name}")
 
-else:
-    st.info("Πρόσθεσε καλλιέργειες για να δεις τα στατιστικά.")
-
-
-# --- ΕΝΟΤΗΤΑ: ΚΑΙΡΟΣ & EFFISPRAY ---
-st.divider()
-st.subheader("🌦️ Καιρικές Συνθήκες & Ψεκασμοί")
-
-# Συντεταγμένες (π.χ. Λάρισα)
-LAT = 39.639
-LON = 22.419
-
-try:
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m"
-    response = requests.get(url) # Προϋποθέτει import requests στην αρχή
-    data = response.json()
+# ==================================================
+# ΣΕΛΙΔΑ 2: ΠΡΟΒΟΛΗ & ΚΑΙΡΟΣ
+# ==================================================
+elif menu_choice == "Προβολή & Καιρός":
     
-    current = data['current_weather']
+    # --- ΥΠΟ-ΕΝΟΤΗΤΑ: ΣΤΑΤΙΣΤΙΚΑ ---
+    st.header("📊 Στατιστικά Καλλιεργειών")
     
-    w_col1, w_col2, w_col3 = st.columns(3)
-    w_col1.metric("Θερμοκρασία", f"{current['temperature']} °C")
-    w_col2.metric("Ταχύτητα Ανέμου", f"{current['windspeed']} km/h")
-    w_col3.info("Live δεδομένα Open-Meteo")
+    if st.session_state.my_crops:
+        # Μετατροπή σε DataFrame για τα γραφήματα
+        df = pd.DataFrame(st.session_state.my_crops)
+        
+        # Προβολή πίνακα δεδομένων (προαιρετικό)
+        with st.expander("Προβολή Πίνακα Δεδομένων"):
+            st.dataframe(df)
 
-except Exception as e:
-    st.warning("⚠️ Δεν φορτώθηκαν τα καιρικά δεδομένα.")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.caption("Παραγωγή (kg)")
+            st.bar_chart(df, x="name", y="quantity")
+            
+        with col2:
+            st.caption("Υγρασία (%)")
+            st.line_chart(df, x="name", y="moisture")
+            
+        total_kg = df['quantity'].sum()
+        st.metric("Συνολική Παραγωγή", f"{total_kg} kg")
+        
+    else:
+        st.info("Δεν υπάρχουν καταχωρημένες καλλιέργειες ακόμα. Πήγαινε στο μενού 'Διαχείριση' για να προσθέσεις.")
 
-# EffiSpray
-st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
-components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
+    # --- ΥΠΟ-ΕΝΟΤΗΤΑ: ΚΑΙΡΟΣ ---
+    st.divider()
+    st.header("🌦️ Καιρικές Συνθήκες (Live)")
+    
+    # Συντεταγμένες (Λάρισα)
+    LAT = 39.639
+    LON = 22.419
+    
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m"
+        response = requests.get(url)
+        data = response.json()
+        current = data['current_weather']
+        
+        w1, w2, w3 = st.columns(3)
+        w1.metric("Θερμοκρασία", f"{current['temperature']} °C")
+        w2.metric("Άνεμος", f"{current['windspeed']} km/h")
+        w3.success("✅ Δεδομένα ΟΚ")
+        
+    except Exception as e:
+        st.error("Δεν φορτώθηκαν τα καιρικά δεδομένα (Ελέγξτε τη σύνδεση).")
+
+    # --- ΥΠΟ-ΕΝΟΤΗΤΑ: EFFISPRAY ---
+    st.divider()
+    st.header("🚜 Εργαλείο Ψεκασμού (EffiSpray)")
+    st.caption("Δείτε τις ιδανικές ώρες για ψεκασμό:")
+    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
