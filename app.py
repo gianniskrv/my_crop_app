@@ -198,11 +198,3 @@ except Exception as e:
 # Το iframe είναι εκτός try/except, τέρμα αριστερά
 st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
 components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
-# 2. ΕΝΣΩΜΑΤΩΣΗ EFFISPRAY (IFRAME)
-st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
-st.caption("Πλοηγήσου στον χάρτη απευθείας από εδώ:")
-
-# Ενσωματώνουμε τη σελίδα μέσα στο app μας
-components.iframe("https://www.effispray.com/el", height=600, scrolling=True)   
- 
-
