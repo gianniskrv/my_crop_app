@@ -4,6 +4,7 @@ import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
+import streamlit.components.v1 as components  # <--- ΠΡΟΣΘΗΚΗ ΓΙΑ ΤΟ EFFISPRAY
 from datetime import date, datetime, timedelta
 import time
 import json
@@ -308,7 +309,7 @@ else:
                     time.sleep(0.5)
                     st.rerun()
 
-    # --- 6. WEATHER (UPDATED - PERSISTENT & CUSTOM CROP) ---
+    # --- 6. WEATHER (UPDATED - EFFISPRAY ADDED) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
         st.caption("Πηγή Δεδομένων: Open-Meteo (Copernicus, NOAA)")
@@ -346,11 +347,9 @@ else:
 
         st.divider()
 
-        # 2. ΡΥΘΜΙΣΕΙΣ ΚΑΛΛΙΕΡΓΕΙΑΣ (CUSTOM INPUTS)
+        # 2. ΡΥΘΜΙΣΕΙΣ ΚΑΛΛΙΕΡΓΕΙΑΣ
         st.subheader("🧬 Ρυθμίσεις Καλλιέργειας (GDD)")
         c_crop, c_var, c_base = st.columns(3)
-        
-        # Αλλαγή Default: Βάζουμε "Σιτάρι" και "0" για να φαίνεται κάτι τον Χειμώνα
         crop_name = c_crop.text_input("Όνομα Καλλιέργειας", value="Σιτάρι (Demo Χειμώνα)")
         crop_var = c_var.text_input("Ποικιλία", value="Skelio")
         tbase = c_base.number_input("Θερμοκρασία Βάσης (Tbase) °C", value=0.0, help="Η ελάχιστη θερμοκρασία που αναπτύσσεται το φυτό.")
@@ -383,7 +382,7 @@ else:
             c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
             c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
 
-            # --- GDD CALCULATION ---
+            # GDD Calculation
             daily = data['daily']
             dates = daily['time']
             tmax = daily['temperature_2m_max']
@@ -397,7 +396,6 @@ else:
                 acc += day_gdd
                 gdd_cum.append(acc)
             
-            # Formatting Title safely
             title_text = f"📈 Ανάπτυξη: {crop_name}"
             if crop_var: title_text += f" ({crop_var})"
 
@@ -407,7 +405,7 @@ else:
             
             with tab_gdd:
                 if max(gdd_cum) == 0:
-                    st.warning("⚠️ Το άθροισμα GDD είναι 0. Αυτό είναι φυσιολογικό αν κάνει κρύο και το Tbase είναι υψηλό (π.χ. Βαμβάκι το Χειμώνα).")
+                    st.warning("⚠️ Το άθροισμα GDD είναι 0. Αυτό είναι φυσιολογικό αν κάνει κρύο και το Tbase είναι υψηλό.")
                 
                 df_gdd = pd.DataFrame({"Date": dates, "Cumulative GDD": gdd_cum})
                 st.area_chart(df_gdd.set_index("Date"), color="#2e7d32")
@@ -422,6 +420,23 @@ else:
                 st.line_chart(df_w.set_index("Date"))
         else:
             st.info("Πατήστε 'Ενημέρωση Δεδομένων' για να δείτε την πρόγνωση.")
+
+        # --- 5. ΕΞΩΤΕΡΙΚΑ ΕΡΓΑΛΕΙΑ (EFFISPRAY) ---
+        st.divider()
+        st.subheader("🛠️ Εξωτερικά Εργαλεία & Βελτιστοποίηση")
+        
+        with st.container(border=True):
+            col_tool_img, col_tool_desc = st.columns([1, 4])
+            with col_tool_desc:
+                st.markdown("### 🚜 EffiSpray")
+                st.write("Το EffiSpray είναι ένα έξυπνο εργαλείο που σας βοηθά να βελτιστοποιήσετε τους ψεκασμούς σας, μειώνοντας το κόστος και βελτιώνοντας την αποτελεσματικότητα.")
+                
+                # Κουμπί για άνοιγμα σε νέο tab
+                st.link_button("🌐 Μετάβαση στο EffiSpray.com", "https://www.effispray.com/el")
+                
+                # Επιλογή για Embed (Iframe)
+                with st.expander("📺 Προβολή EffiSpray εδώ (Εντός εφαρμογής)"):
+                    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
     elif selected == "Logout":
         logout()
