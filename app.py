@@ -21,9 +21,9 @@ FILES = {
     "users": "users.json",
     "history": "history.json",
     "expenses": "expenses.json",
-    "inventory": "inventory.json",   # 📦 ΝΕΟ: Αποθήκη
-    "machinery": "machinery.json",   # 🚜 ΝΕΟ: Μηχανήματα
-    "calendar": "calendar.json"      # 📅 ΝΕΟ: Ημερολόγιο
+    "inventory": "inventory.json",
+    "machinery": "machinery.json",
+    "calendar": "calendar.json"
 }
 
 # --- ΒΟΗΘΗΤΙΚΕΣ ΣΥΝΑΡΤΗΣΕΙΣ ---
@@ -47,7 +47,6 @@ def load_data():
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Date parsing fix
                 for d in data:
                     if 'date' in d and isinstance(d['date'], str):
                         d['date'] = datetime.strptime(d['date'][:10], "%Y-%m-%d").date()
@@ -63,30 +62,23 @@ def save_data(key):
         with open(target_file, 'w', encoding='utf-8') as f:
             json.dump(st.session_state[state_key], f, default=date_handler, indent=4, ensure_ascii=False)
 
-# --- PDF GENERATOR (Βασική Υποστήριξη) ---
+# --- PDF GENERATOR ---
 def create_pdf(dataframe, title):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=title, ln=1, align='C')
     pdf.ln(10)
-    
-    # Simple table dump (Note: Greek chars require special fonts in FPDF, using Latin for safety)
     col_width = pdf.w / 4.5
     row_height = 10
-    
-    # Headers
     headers = [str(c) for c in dataframe.columns]
     for h in headers:
-        pdf.cell(col_width, row_height, h[:10], border=1) # Truncate long headers
+        pdf.cell(col_width, row_height, h[:10], border=1)
     pdf.ln(row_height)
-    
-    # Rows
     for index, row in dataframe.iterrows():
         for item in row:
             pdf.cell(col_width, row_height, str(item)[:10], border=1)
         pdf.ln(row_height)
-        
     return pdf.output(dest='S').encode('latin-1', 'ignore')
 
 # ==============================================================================
@@ -143,7 +135,6 @@ else:
     # ==================================================
     with st.sidebar:
         st.markdown(f"### 👤 {st.session_state.current_user['name']}")
-        
         selected = option_menu(
             menu_title="Μενού",
             options=["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο", "Καιρός", "Logout"],
@@ -152,14 +143,11 @@ else:
             styles={"nav-link-selected": {"background-color": "#2e7d32"}}
         )
 
-    # --- 1. DASHBOARD & YEARLY COMPARISON ---
+    # --- 1. DASHBOARD ---
     if selected == "Dashboard":
         st.title("📊 Επισκόπηση & Στατιστικά")
-        
         df_inc = pd.DataFrame(st.session_state.history_log)
         df_exp = pd.DataFrame(st.session_state.expenses_log)
-        
-        # Financials
         rev = df_inc['revenue'].sum() if not df_inc.empty else 0
         exp = df_exp['amount_total'].sum() if not df_exp.empty else 0
         
@@ -168,25 +156,21 @@ else:
         c2.metric("📈 Έσοδα", f"{rev:.2f} €")
         c3.metric("💸 Έξοδα", f"{exp:.2f} €")
         
-        # Pending Tasks Count
         tasks = st.session_state.calendar_db
         pending = len([t for t in tasks if not t.get('done', False)])
         c4.metric("📅 Εκκρεμότητες", f"{pending}", delta="Εργασίες", delta_color="off")
         
         st.divider()
-        
-        # --- NEW: YEAR OVER YEAR COMPARISON ---
         st.subheader("📊 Σύγκριση Ετών (Year-over-Year)")
         if not df_inc.empty:
             df_inc['year'] = pd.to_datetime(df_inc['date']).dt.year
             yearly_inc = df_inc.groupby('year')['revenue'].sum().reset_index()
-            
             fig_comp = px.bar(yearly_inc, x='year', y='revenue', title="Έσοδα ανά Έτος", color='revenue', color_continuous_scale='Greens')
             st.plotly_chart(fig_comp, use_container_width=True)
         else:
             st.info("Δεν υπάρχουν αρκετά δεδομένα για σύγκριση.")
 
-    # --- 2. ΟΙΚΟΝΟΜΙΚΑ (INCOME/EXPENSES/PDF) ---
+    # --- 2. ΟΙΚΟΝΟΜΙΚΑ ---
     elif selected == "Οικονομικά":
         st.title("📝 Διαχείριση Οικονομικών")
         t1, t2, t3 = st.tabs(["💵 Έσοδα", "💸 Έξοδα", "🖨️ Αναφορές PDF"])
@@ -226,27 +210,20 @@ else:
             if st.session_state.history_log:
                 df = pd.DataFrame(st.session_state.history_log)
                 col_p1.download_button("📥 Λήψη CSV Εσόδων", df.to_csv(index=False).encode('utf-8-sig'), "income.csv")
-                # PDF Button (Basic)
-                # pdf_bytes = create_pdf(df, "Income Report")
-                # col_p1.download_button("📄 Λήψη PDF (Beta)", data=pdf_bytes, file_name="income_report.pdf", mime='application/pdf')
-            
             if st.session_state.expenses_log:
                 df2 = pd.DataFrame(st.session_state.expenses_log)
                 col_p2.download_button("📥 Λήψη CSV Εξόδων", df2.to_csv(index=False).encode('utf-8-sig'), "expenses.csv")
 
-    # --- 3. ΑΠΟΘΗΚΗ (NEW) ---
+    # --- 3. ΑΠΟΘΗΚΗ ---
     elif selected == "Αποθήκη":
         st.title("📦 Διαχείριση Αποθήκης")
-        
         with st.expander("➕ Προσθήκη / Ενημέρωση Stock", expanded=False):
             with st.form("stock_form"):
-                item = st.text_input("Όνομα Προϊόντος (π.χ. Ουρία)")
+                item = st.text_input("Όνομα Προϊόντος")
                 cat = st.selectbox("Κατηγορία", ["Λιπάσματα", "Σπόροι", "Φάρμακα", "Ανταλλακτικά"])
-                qty = st.number_input("Ποσότητα (+ για αγορά, - για χρήση)", step=1.0)
+                qty = st.number_input("Ποσότητα (+ αγορά, - χρήση)", step=1.0)
                 unit = st.selectbox("Μονάδα", ["kg", "lt", "τεμάχια"])
-                
                 if st.form_submit_button("Ενημέρωση"):
-                    # Logic: Find if exists and update, else create
                     found = False
                     for p in st.session_state.inventory_db:
                         if p['item'] == item:
@@ -255,36 +232,29 @@ else:
                             break
                     if not found:
                         st.session_state.inventory_db.append({"item": item, "category": cat, "quantity": qty, "unit": unit})
-                    
                     save_data("inventory")
-                    st.success(f"Το απόθεμα για '{item}' ενημερώθηκε!")
+                    st.success(f"Ενημερώθηκε: {item}")
                     st.rerun()
 
-        # Display Stock
         if st.session_state.inventory_db:
             df_inv = pd.DataFrame(st.session_state.inventory_db)
             st.dataframe(df_inv, use_container_width=True)
-            
-            # Low Stock Alert
             low_stock = df_inv[df_inv['quantity'] < 10]
             if not low_stock.empty:
                 st.warning(f"⚠️ Χαμηλό απόθεμα σε: {', '.join(low_stock['item'].tolist())}")
         else:
             st.info("Η αποθήκη είναι άδεια.")
 
-    # --- 4. ΜΗΧΑΝΗΜΑΤΑ (NEW) ---
+    # --- 4. ΜΗΧΑΝΗΜΑΤΑ ---
     elif selected == "Μηχανήματα":
         st.title("🚜 Στόλος & Συντήρηση")
-        
         with st.expander("➕ Προσθήκη Μηχανήματος", expanded=False):
             with st.form("mach_form"):
                 m_name = st.text_input("Όνομα (π.χ. John Deere 6120)")
                 m_hours = st.number_input("Ώρες Λειτουργίας", 0)
                 last_serv = st.date_input("Τελευταίο Service")
                 if st.form_submit_button("Προσθήκη"):
-                    st.session_state.machinery_db.append({
-                        "name": m_name, "hours": m_hours, "last_service": last_serv
-                    })
+                    st.session_state.machinery_db.append({"name": m_name, "hours": m_hours, "last_service": last_serv})
                     save_data("machinery")
                     st.success("Προστέθηκε!")
                     st.rerun()
@@ -295,26 +265,19 @@ else:
                     c1, c2, c3 = st.columns([2, 1, 1])
                     c1.subheader(f"🚜 {machine['name']}")
                     c2.write(f"⏱️ **{machine['hours']}** ώρες")
-                    
-                    # Service Logic
                     last_s = machine['last_service']
                     if isinstance(last_s, str): last_s = datetime.strptime(last_s, "%Y-%m-%d").date()
                     days_diff = (date.today() - last_s).days
-                    
                     c3.write(f"📅 Service: {last_s}")
-                    if days_diff > 365:
-                        st.error(f"⚠️ Service overdue ({days_diff} μέρες)!")
-                    else:
-                        st.success("✅ Κατάσταση OK")
+                    if days_diff > 365: st.error(f"⚠️ Service overdue ({days_diff} μέρες)!")
+                    else: st.success("✅ Κατάσταση OK")
         else:
             st.info("Δεν έχετε καταχωρήσει μηχανήματα.")
 
-    # --- 5. ΗΜΕΡΟΛΟΓΙΟ (NEW) ---
+    # --- 5. ΗΜΕΡΟΛΟΓΙΟ ---
     elif selected == "Ημερολόγιο":
         st.title("📅 Ημερολόγιο Εργασιών")
-        
         c_in, c_view = st.columns([1, 2])
-        
         with c_in:
             with st.form("task_form"):
                 st.subheader("Νέα Εργασία")
@@ -322,59 +285,100 @@ else:
                 task_date = st.date_input("Ημερομηνία")
                 task_prio = st.selectbox("Προτεραιότητα", ["Normal", "High"])
                 if st.form_submit_button("Προσθήκη"):
-                    st.session_state.calendar_db.append({
-                        "title": task_title, "date": task_date, "priority": task_prio, "done": False
-                    })
+                    st.session_state.calendar_db.append({"title": task_title, "date": task_date, "priority": task_prio, "done": False})
                     save_data("calendar")
                     st.success("Προστέθηκε!")
                     st.rerun()
-
         with c_view:
             st.subheader("Προσεχείς Εργασίες")
             tasks = st.session_state.calendar_db
-            # Sort by date
             tasks.sort(key=lambda x: str(x['date']))
-            
             for i, task in enumerate(tasks):
-                # Checkbox to mark as done
                 cols = st.columns([0.1, 0.7, 0.2])
                 is_done = cols[0].checkbox("", value=task.get('done', False), key=f"task_{i}")
-                
-                # Style logic
                 title_style = f"~~{task['title']}~~" if is_done else f"**{task['title']}**"
                 color = "red" if task['priority'] == "High" and not is_done else "black"
-                
                 cols[1].markdown(f":{color}[{title_style}]")
                 cols[2].caption(f"{task['date']}")
-                
-                # Update state if changed
                 if is_done != task.get('done', False):
                     task['done'] = is_done
                     save_data("calendar")
                     time.sleep(0.5)
                     st.rerun()
 
-    # --- 6. WEATHER ---
+    # --- 6. WEATHER (UPDATED) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
-        st.info("Δεδομένα από Open-Meteo API")
         
-        col1, col2 = st.columns(2)
-        lat = col1.number_input("Latitude", value=39.6390)
-        lon = col2.number_input("Longitude", value=22.4191)
+        # ΕΠΙΛΟΓΗ ΤΡΟΠΟΥ ΑΝΑΖΗΤΗΣΗΣ
+        mode = st.radio("Τρόπος Επιλογής Τοποθεσίας:", ["🔍 Αναζήτηση Πόλης", "📍 Συντεταγμένες"], horizontal=True)
         
-        if st.button("Ανανέωση"):
+        # Default Τιμές (Λάρισα)
+        lat, lon = 39.6390, 22.4191
+        display_name = "Λάρισα (Default)"
+
+        if mode == "🔍 Αναζήτηση Πόλης":
+            search_city = st.text_input("Πληκτρολογήστε πόλη (π.χ. Λάρισα, Θεσσαλονίκη)")
+            if search_city:
+                try:
+                    # Geocoding API Call (Open-Meteo)
+                    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={search_city}&count=5&language=el&format=json"
+                    geo_res = requests.get(geo_url).json()
+                    
+                    if "results" in geo_res and geo_res['results']:
+                        results = geo_res['results']
+                        # Φτιάχνουμε λίστα επιλογών για το Dropdown
+                        city_options = {}
+                        for r in results:
+                            label = f"{r['name']}, {r.get('country', '')} ({r.get('admin1', '')})"
+                            city_options[label] = r
+                        
+                        selected_city_label = st.selectbox("Επιλέξτε τη σωστή τοποθεσία:", list(city_options.keys()))
+                        
+                        if selected_city_label:
+                            sel_data = city_options[selected_city_label]
+                            lat = sel_data['latitude']
+                            lon = sel_data['longitude']
+                            display_name = selected_city_label
+                            st.success(f"📍 Επιλέχθηκε: **{display_name}**")
+                    else:
+                        st.warning("Δεν βρέθηκε η πόλη. Δοκιμάστε με λατινικούς χαρακτήρες αν υπάρχει πρόβλημα.")
+                except Exception as e:
+                    st.error(f"Σφάλμα σύνδεσης: {e}")
+        else:
+            # Manual Coords
+            col1, col2 = st.columns(2)
+            lat = col1.number_input("Latitude", value=39.6390, format="%.4f")
+            lon = col2.number_input("Longitude", value=22.4191, format="%.4f")
+            display_name = f"{lat}, {lon}"
+
+        st.divider()
+
+        if st.button("🔄 Λήψη Πρόγνωσης"):
             try:
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&past_days=10"
+                # Weather API Call
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=10&timezone=auto"
                 res = requests.get(url).json()
-                st.metric("Θερμοκρασία Τώρα", f"{res['current']['temperature_2m']} °C")
                 
-                # Simple GDD Chart
+                # Current Weather
+                curr = res['current']
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Θερμοκρασία", f"{curr['temperature_2m']} °C")
+                c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
+                c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
+                
+                # Chart
+                st.subheader("📈 Θερμοκρασία (Max/Min)")
                 daily = res['daily']
-                df_w = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
+                df_w = pd.DataFrame({
+                    "Date": daily['time'], 
+                    "Max Temp": daily['temperature_2m_max'],
+                    "Min Temp": daily['temperature_2m_min']
+                })
                 st.line_chart(df_w.set_index("Date"))
-            except:
-                st.error("Σφάλμα σύνδεσης.")
+                
+            except Exception as e:
+                st.error(f"Σφάλμα λήψης δεδομένων καιρού: {e}")
 
     elif selected == "Logout":
         logout()
