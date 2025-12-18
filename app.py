@@ -8,32 +8,10 @@ import time
 import smtplib
 import ssl
 import random
-import json  # <--- ΠΡΟΣΘΗΚΗ ΓΙΑ ΑΠΟΘΗΚΕΥΣΗ
-import os    # <--- ΠΡΟΣΘΗΚΗ ΓΙΑ ΕΛΕΓΧΟ ΑΡΧΕΙΩΝ
 from email.message import EmailMessage
 
 # --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
-
-# ==============================================================================
-# 📂 ΣΥΣΤΗΜΑ ΒΑΣΗΣ ΔΕΔΟΜΕΝΩΝ (JSON FILES)
-# ==============================================================================
-USERS_FILE = "users.json"
-
-# Συνάρτηση φόρτωσης χρηστών από το αρχείο
-def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {} # Αν υπάρχει error, επιστρέφει κενό
-    return {}
-
-# Συνάρτηση αποθήκευσης χρηστών στο αρχείο
-def save_users(users_data):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users_data, f, indent=4, ensure_ascii=False)
 
 # ==============================================================================
 # 🎨 UI & DESIGN (CSS STYLING)
@@ -64,10 +42,9 @@ def local_css():
             border-radius: 8px;
             border: 1px solid #a5d6a7;
         }
-        
-        /* Κρύβουμε μόνο τα περιττά, ΟΧΙ το header για να φαίνεται το μενού στο κινητό */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+        header {visibility: hidden;}
         .stDeployButton {display:none;}
     </style>
     """, unsafe_allow_html=True)
@@ -75,39 +52,28 @@ def local_css():
 local_css()
 
 # ==============================================================================
-# 👤 SESSION STATE & USERS INITIALIZATION
+# 👤 SESSION STATE & USERS
 # ==============================================================================
 
-# Αρχική λίστα αν δεν υπάρχει αρχείο
-default_users = {
-    "user": {
-        "password": "123", 
-        "role": "user", 
-        "name": "Επισκέπτης", 
-        "email": "user@example.com",
-        "phone": "6900000000"
-    },
-    "GiannisKrv": {
-        "password": "21041414", 
-        "role": "owner", 
-        "name": "Γιάννης", 
-        "email": "johnkrv1@gmail.com",
-        "phone": "6912345678"
-    }
-}
-
-# Φόρτωση από το αρχείο κατά την εκκίνηση
 if 'users_db' not in st.session_state:
-    loaded_data = load_users()
-    if loaded_data:
-        st.session_state.users_db = loaded_data
-        # Διασφάλιση ότι ο Owner υπάρχει πάντα (σε περίπτωση που σβηστεί το αρχείο)
-        if "GiannisKrv" not in st.session_state.users_db:
-            st.session_state.users_db["GiannisKrv"] = default_users["GiannisKrv"]
-            save_users(st.session_state.users_db)
-    else:
-        st.session_state.users_db = default_users
-        save_users(default_users) # Δημιουργία αρχείου πρώτη φορά
+    st.session_state.users_db = {
+        "user": {
+            "password": "123", 
+            "role": "user", 
+            "name": "Επισκέπτης", 
+            "email": "user@example.com",
+            "phone": "6900000000"
+        }
+    }
+
+# OWNER
+st.session_state.users_db["GiannisKrv"] = {
+    "password": "21041414", 
+    "role": "owner", 
+    "name": "Γιάννης", 
+    "email": "johnkrv1@gmail.com",
+    "phone": "6912345678"
+}
 
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 if 'current_user' not in st.session_state: st.session_state.current_user = None
@@ -154,9 +120,6 @@ def convert_df(df):
 
 # --- AUTH FUNCTIONS ---
 def login_user(username, password):
-    # Ξαναφορτώνουμε τα δεδομένα για να είμαστε σίγουροι ότι έχουμε τις τελευταίες εγγραφές
-    st.session_state.users_db = load_users()
-    
     if username in st.session_state.users_db:
         if st.session_state.users_db[username]['password'] == password:
             st.session_state.authenticated = True
@@ -171,9 +134,6 @@ def login_user(username, password):
         st.error("Ο χρήστης δεν βρέθηκε.")
 
 def register_user(new_user, new_pass, new_name, new_email, new_phone):
-    # Ξαναφορτώνουμε τα δεδομένα πριν γράψουμε
-    st.session_state.users_db = load_users()
-    
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
@@ -184,10 +144,7 @@ def register_user(new_user, new_pass, new_name, new_email, new_phone):
             "email": new_email,
             "phone": new_phone
         }
-        # ΑΠΟΘΗΚΕΥΣΗ ΣΤΟ ΑΡΧΕΙΟ ΓΙΑ ΝΑ ΤΟ ΔΕΙ Ο OWNER
-        save_users(st.session_state.users_db)
-        
-        st.success("Επιτυχία! Ο λογαριασμός δημιουργήθηκε. Τώρα μπορείτε να συνδεθείτε.")
+        st.success("Επιτυχία! Συνδεθείτε.")
         send_email_notification(new_email, "Καλωσήρισες στο AgroManager", f"Γεια σου {new_name},\nΟ λογαριασμός σου ενεργοποιήθηκε.")
 
 def logout():
@@ -211,8 +168,6 @@ if not st.session_state.authenticated:
                 email_input = st.text_input("Εισάγετε το Email σας:")
                 col_r1, col_r2 = st.columns(2)
                 if col_r1.button("Αποστολή Κωδικού", use_container_width=True):
-                    # Φόρτωση χρηστών
-                    st.session_state.users_db = load_users()
                     found_user = None
                     for uname, udata in st.session_state.users_db.items():
                         if udata.get('email') == email_input:
@@ -243,8 +198,6 @@ if not st.session_state.authenticated:
                         if new_password:
                             uname = st.session_state.reset_username_target
                             st.session_state.users_db[uname]['password'] = new_password
-                            # Αποθήκευση αλλαγής
-                            save_users(st.session_state.users_db)
                             st.success("Επιτυχία!")
                             st.session_state.reset_mode = False
                             st.session_state.reset_step = 1
@@ -261,30 +214,26 @@ if not st.session_state.authenticated:
         else:
             tab1, tab2 = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
             with tab1:
-                with st.form("login_form"):
-                    username = st.text_input("Username")
-                    password = st.text_input("Password", type="password")
-                    submit_login = st.form_submit_button("Είσοδος", use_container_width=True)
-                    if submit_login:
-                        login_user(username, password)
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                if st.button("Είσοδος", use_container_width=True):
+                    login_user(username, password)
                 st.markdown("---")
                 if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True):
                     st.session_state.reset_mode = True
                     st.rerun()
             with tab2:
-                with st.form("register_form", clear_on_submit=False):
-                    st.write("Δημιουργήστε νέο λογαριασμό:")
-                    new_user = st.text_input("Επιθυμητό Username")
-                    new_pass = st.text_input("Επιθυμητό Password", type="password")
-                    new_name = st.text_input("Ονοματεπώνυμο")
-                    new_email = st.text_input("Email")
-                    new_phone = st.text_input("Κινητό Τηλέφωνο")
-                    submit_register = st.form_submit_button("Δημιουργία Λογαριασμού", use_container_width=True)
-                    if submit_register:
-                        if new_user and new_pass and new_name and new_email and new_phone:
-                            register_user(new_user, new_pass, new_name, new_email, new_phone)
-                        else:
-                            st.warning("Παρακαλώ συμπληρώστε ΟΛΑ τα πεδία.")
+                st.write("Δημιουργήστε νέο λογαριασμό:")
+                new_user = st.text_input("Επιθυμητό Username")
+                new_pass = st.text_input("Επιθυμητό Password", type="password")
+                new_name = st.text_input("Ονοματεπώνυμο")
+                new_email = st.text_input("Email")
+                new_phone = st.text_input("Κινητό Τηλέφωνο")
+                if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
+                    if new_user and new_pass and new_name and new_email:
+                        register_user(new_user, new_pass, new_name, new_email, new_phone)
+                    else:
+                        st.warning("Συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
@@ -525,133 +474,156 @@ else:
                     c_ex2.info("Χωρίς έξοδα.")
 
     # --------------------------------------------------
-    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (GDD & VRT)
+    # 4. ΚΑΙΡΟΣ & ΓΕΩΡΓΙΑ ΑΚΡΙΒΕΙΑΣ (IMPROVED RELIABILITY)
     # --------------------------------------------------
     elif menu_choice == "☁️ Καιρός & Γεωργία Ακριβείας":
         st.header("🌦️ Καιρός & Γεωργία Ακριβείας")
         
-        col_search, col_btn = st.columns([3, 1])
-        user_city = col_search.text_input("🔍 Αναζήτηση Περιοχής", value="Larissa")
+        # --- ΕΠΙΛΟΓΗ ΜΕΘΟΔΟΥ ΑΝΑΖΗΤΗΣΗΣ ---
+        st.caption("Επιλέξτε τρόπο αναζήτησης. Η χρήση συντεταγμένων προσφέρει τη μέγιστη ακρίβεια για το χωράφι σας.")
+        search_mode = st.radio("Τρόπος Αναζήτησης:", ["🏙️ Πόλη", "🌐 Συντεταγμένες (GPS)"], horizontal=True)
         
-        if user_city:
+        lat, lon = None, None
+        display_name = ""
+        
+        col_input, col_info = st.columns([2, 1])
+        
+        with col_input:
+            if search_mode == "🏙️ Πόλη":
+                user_city = st.text_input("🔍 Αναζήτηση Πόλης", value="Larissa")
+                if user_city:
+                    try:
+                        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={user_city}&count=1&language=el&format=json"
+                        geo_res = requests.get(geo_url).json()
+                        if "results" in geo_res:
+                            data = geo_res['results'][0]
+                            lat, lon = data['latitude'], data['longitude']
+                            display_name = f"{data['name']}, {data.get('country', '')}"
+                        else:
+                            st.warning("Η πόλη δεν βρέθηκε.")
+                    except:
+                        st.error("Σφάλμα σύνδεσης.")
+            else:
+                # GPS Inputs
+                c_lat, c_lon = st.columns(2)
+                lat = c_lat.number_input("Γεωγραφικό Πλάτος (Latitude)", value=39.6390, format="%.4f")
+                lon = c_lon.number_input("Γεωγραφικό Μήκος (Longitude)", value=22.4191, format="%.4f")
+                display_name = f"Στίγμα: {lat}, {lon}"
+
+        # --- ΕΜΦΑΝΙΣΗ ΚΑΙΡΟΥ ---
+        if lat is not None and lon is not None:
+            st.success(f"📍 Τοποθεσία: **{display_name}**")
+            
             try:
-                geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={user_city}&count=1&language=el&format=json"
-                geo_res = requests.get(geo_url).json()
+                # Call Open-Meteo
+                weather_url = (
+                    f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                    "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+                    "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
+                )
+                w_res = requests.get(weather_url).json()
+                
+                curr = w_res['current']
+                daily = w_res['daily']
 
-                if "results" in geo_res:
-                    data = geo_res['results'][0]
-                    lat, lon = data['latitude'], data['longitude']
-                    name, country = data['name'], data.get("country", "")
-
-                    st.success(f"📍 Περιοχή: **{name}, {country}**")
-
-                    weather_url = (
-                        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-                        "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
-                        "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
-                    )
-                    w_res = requests.get(weather_url).json()
-                    curr = w_res['current']
-                    daily = w_res['daily']
-
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("🌡️ Θερμοκρασία", f"{curr['temperature_2m']} °C")
-                    c2.metric("💧 Υγρασία", f"{curr['relative_humidity_2m']} %")
-                    c3.metric("☔ Βροχή", f"{curr['precipitation']} mm")
-                    c4.metric("💨 Άνεμος", f"{curr['wind_speed_10m']} km/h")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("🌡️ Θερμοκρασία", f"{curr['temperature_2m']} °C")
+                c2.metric("💧 Υγρασία", f"{curr['relative_humidity_2m']} %")
+                c3.metric("☔ Βροχή", f"{curr['precipitation']} mm")
+                c4.metric("💨 Άνεμος", f"{curr['wind_speed_10m']} km/h")
+                
+                st.divider()
+                
+                # --- GDD CALCULATOR ---
+                st.subheader("🧬 Υπολογιστής Ημεροβαθμών Ανάπτυξης (GDD)")
+                
+                with st.container(border=True):
+                    col_crop1, col_crop2 = st.columns(2)
+                    crop_gdd_sel = col_crop1.selectbox("Επιλογή Καλλιέργειας:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα", "✏️ Άλλο / Custom"])
+                    variety_gdd = col_crop2.text_input("Ποικιλία (Variety):", placeholder="π.χ. ST-402")
                     
-                    st.divider()
+                    t_base = 10.0
+                    final_crop_name = crop_gdd_sel
                     
-                    # --- GDD CALCULATOR ---
-                    st.subheader("🧬 Υπολογιστής Ημεροβαθμών Ανάπτυξης (GDD)")
+                    if crop_gdd_sel == "✏️ Άλλο / Custom":
+                        col_c1, col_c2 = st.columns(2)
+                        final_crop_name = col_c1.text_input("Όνομα Καλλιέργειας", placeholder="π.χ. Φιστίκι")
+                        t_base = col_c2.number_input("Βασική Θερμοκρασία (Tbase) °C:", min_value=0.0, value=10.0, step=0.1)
+                    else:
+                        if crop_gdd_sel == "Βαμβάκι": t_base = 15.6
+                        elif crop_gdd_sel == "Καλαμπόκι": t_base = 10.0
+                        elif crop_gdd_sel == "Σιτάρι": t_base = 0.0
+                        elif crop_gdd_sel == "Τομάτα": t_base = 10.0
                     
-                    with st.container(border=True):
-                        col_crop1, col_crop2 = st.columns(2)
-                        crop_gdd_sel = col_crop1.selectbox("Επιλογή Καλλιέργειας:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Τομάτα", "✏️ Άλλο / Custom"])
-                        variety_gdd = col_crop2.text_input("Ποικιλία (Variety):", placeholder="π.χ. ST-402")
-                        
-                        t_base = 10.0
-                        final_crop_name = crop_gdd_sel
-                        
-                        if crop_gdd_sel == "✏️ Άλλο / Custom":
-                            col_c1, col_c2 = st.columns(2)
-                            final_crop_name = col_c1.text_input("Όνομα Καλλιέργειας", placeholder="π.χ. Φιστίκι")
-                            t_base = col_c2.number_input("Βασική Θερμοκρασία (Tbase) °C:", min_value=0.0, value=10.0, step=0.1)
-                        else:
-                            if crop_gdd_sel == "Βαμβάκι": t_base = 15.6
-                            elif crop_gdd_sel == "Καλαμπόκι": t_base = 10.0
-                            elif crop_gdd_sel == "Σιτάρι": t_base = 0.0
-                            elif crop_gdd_sel == "Τομάτα": t_base = 10.0
-                        
-                        t_max = daily['temperature_2m_max'][0]
-                        t_min = daily['temperature_2m_min'][0]
-                        gdd = ((t_max + t_min) / 2) - t_base
-                        if gdd < 0: gdd = 0
-                        
-                        k1, k2, k3 = st.columns(3)
-                        k1.metric("Μέγιστη", f"{t_max} °C")
-                        k2.metric("Ελάχιστη", f"{t_min} °C")
-                        k3.metric("Tbase", f"{t_base} °C")
-                        
-                        st.markdown(f"#### 🌡️ GDD Σήμερα ({final_crop_name} - {variety_gdd}): **{gdd:.1f}**")
-                        if gdd > 0: st.success("✅ Το φυτό αναπτύσσεται κανονικά.")
-                        else: st.warning("❄️ Η ανάπτυξη έχει σταματήσει.")
+                    t_max = daily['temperature_2m_max'][0]
+                    t_min = daily['temperature_2m_min'][0]
+                    gdd = ((t_max + t_min) / 2) - t_base
+                    if gdd < 0: gdd = 0
+                    
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric("Μέγιστη", f"{t_max} °C")
+                    k2.metric("Ελάχιστη", f"{t_min} °C")
+                    k3.metric("Tbase", f"{t_base} °C")
+                    
+                    st.markdown(f"#### 🌡️ GDD Σήμερα ({final_crop_name} - {variety_gdd}): **{gdd:.1f}**")
+                    if gdd > 0: st.success("✅ Το φυτό αναπτύσσεται κανονικά.")
+                    else: st.warning("❄️ Η ανάπτυξη έχει σταματήσει.")
 
-                    st.divider()
+                st.divider()
+                
+                # --- VRT CALCULATOR ---
+                st.subheader("🧪 Υπολογιστής Λίπανσης (VRT Logic)")
+                
+                with st.container(border=True):
+                    col_vrt1, col_vrt2 = st.columns(2)
+                    crop_fert_sel = col_vrt1.selectbox("Καλλιέργεια:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "✏️ Άλλο / Custom"])
+                    variety_vrt = col_vrt2.text_input("Ποικιλία:", placeholder="π.χ. Pioneer P1570")
                     
-                    # --- VRT CALCULATOR ---
-                    st.subheader("🧪 Υπολογιστής Λίπανσης (VRT Logic)")
+                    removal_coeff = 0.0
+                    final_fert_crop = crop_fert_sel
                     
-                    with st.container(border=True):
-                        col_vrt1, col_vrt2 = st.columns(2)
-                        crop_fert_sel = col_vrt1.selectbox("Καλλιέργεια:", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "✏️ Άλλο / Custom"])
-                        variety_vrt = col_vrt2.text_input("Ποικιλία:", placeholder="π.χ. Pioneer P1570")
-                        
-                        removal_coeff = 0.0
-                        final_fert_crop = crop_fert_sel
-                        
-                        if crop_fert_sel == "✏️ Άλλο / Custom":
-                            col_vc1, col_vc2 = st.columns(2)
-                            final_fert_crop = col_vc1.text_input("Όνομα Καλλιέργειας (VRT)", placeholder="π.χ. Ηλίανθος")
-                            removal_coeff = col_vc2.number_input("Μονάδες Αζώτου (N) ανά 100kg καρπού:", min_value=0.0, value=3.0, step=0.1)
-                        else:
-                            if crop_fert_sel == "Βαμβάκι": removal_coeff = 4.5
-                            elif crop_fert_sel == "Καλαμπόκι": removal_coeff = 2.5
-                            elif crop_fert_sel == "Σιτάρι": removal_coeff = 3.0
-                        
-                        target_yield = st.number_input("Στόχος Παραγωγής (kg/στρέμμα):", min_value=100, step=50, value=400)
-                        n_needs = (target_yield / 100) * removal_coeff
-                        
-                        fert_sel = st.selectbox("Τύπος Λιπάσματος:", ["Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "✏️ Άλλο / Custom"])
-                        
-                        n_content = 0.0
-                        final_fert_name = fert_sel
-                        
-                        if fert_sel == "✏️ Άλλο / Custom":
-                            col_f1, col_f2 = st.columns(2)
-                            final_fert_name = col_f1.text_input("Όνομα Λιπάσματος", placeholder="π.χ. UTEC 46")
-                            n_percent = col_f2.number_input("Περιεκτικότητα N (%):", min_value=0.0, max_value=100.0, step=0.1)
-                            n_content = n_percent / 100.0
-                        else:
-                            if "46" in fert_sel: n_content = 0.46
-                            elif "34.5" in fert_sel: n_content = 0.345
-                            elif "21" in fert_sel: n_content = 0.21
-                            elif "20" in fert_sel: n_content = 0.20
-                        
-                        if n_content > 0 and removal_coeff > 0:
-                            efficiency = 0.8
-                            fert_kg = (n_needs / n_content) / efficiency
-                            st.info(f"Για στόχο **{target_yield} kg/στρ** {final_fert_crop} ({variety_vrt}), απαιτούνται **{n_needs:.1f} μονάδες Αζώτου**.")
-                            st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg:.1f} kg/στρέμμα** {final_fert_name}")
-                        elif "✏️" in crop_fert_sel or "✏️" in fert_sel:
-                            st.warning("Συμπληρώστε τα πεδία Custom.")
+                    if crop_fert_sel == "✏️ Άλλο / Custom":
+                        col_vc1, col_vc2 = st.columns(2)
+                        final_fert_crop = col_vc1.text_input("Όνομα Καλλιέργειας (VRT)", placeholder="π.χ. Ηλίανθος")
+                        removal_coeff = col_vc2.number_input("Μονάδες Αζώτου (N) ανά 100kg καρπού:", min_value=0.0, value=3.0, step=0.1)
+                    else:
+                        if crop_fert_sel == "Βαμβάκι": removal_coeff = 4.5
+                        elif crop_fert_sel == "Καλαμπόκι": removal_coeff = 2.5
+                        elif crop_fert_sel == "Σιτάρι": removal_coeff = 3.0
+                    
+                    target_yield = st.number_input("Στόχος Παραγωγής (kg/στρέμμα):", min_value=100, step=50, value=400)
+                    n_needs = (target_yield / 100) * removal_coeff
+                    
+                    fert_sel = st.selectbox("Τύπος Λιπάσματος:", ["Ουρία (46-0-0)", "Νιτρική Αμμωνία (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "✏️ Άλλο / Custom"])
+                    
+                    n_content = 0.0
+                    final_fert_name = fert_sel
+                    
+                    if fert_sel == "✏️ Άλλο / Custom":
+                        col_f1, col_f2 = st.columns(2)
+                        final_fert_name = col_f1.text_input("Όνομα Λιπάσματος", placeholder="π.χ. UTEC 46")
+                        n_percent = col_f2.number_input("Περιεκτικότητα N (%):", min_value=0.0, max_value=100.0, step=0.1)
+                        n_content = n_percent / 100.0
+                    else:
+                        if "46" in fert_sel: n_content = 0.46
+                        elif "34.5" in fert_sel: n_content = 0.345
+                        elif "21" in fert_sel: n_content = 0.21
+                        elif "20" in fert_sel: n_content = 0.20
+                    
+                    if n_content > 0 and removal_coeff > 0:
+                        efficiency = 0.8
+                        fert_kg = (n_needs / n_content) / efficiency
+                        st.info(f"Για στόχο **{target_yield} kg/στρ** {final_fert_crop} ({variety_vrt}), απαιτούνται **{n_needs:.1f} μονάδες Αζώτου**.")
+                        st.success(f"👉 Συνιστώμενη Δόση: **{fert_kg:.1f} kg/στρέμμα** {final_fert_name}")
+                    elif "✏️" in crop_fert_sel or "✏️" in fert_sel:
+                        st.warning("Συμπληρώστε τα πεδία Custom.")
 
-                    st.markdown("---")
-                    st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
-                else:
-                    st.warning("Η πόλη δεν βρέθηκε.")
-            except:
-                st.error("Υπήρξε πρόβλημα με τη σύνδεση.")
+                st.markdown("---")
+                # MAP
+                st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}))
+                
+            except Exception as e:
+                st.error(f"Υπήρξε πρόβλημα με τη σύνδεση καιρού: {e}")
 
         st.divider()
         st.write("### 🚜 Εργαλείο Ψεκασμού (EffiSpray)")
@@ -678,26 +650,18 @@ else:
                 
                 if st.form_submit_button("💾 Αποθήκευση"):
                     uname = st.session_state.current_username
-                    # Φόρτωση φρέσκων δεδομένων
-                    current_db = load_users()
+                    st.session_state.users_db[uname]['name'] = new_name
+                    st.session_state.users_db[uname]['email'] = new_email
+                    st.session_state.users_db[uname]['phone'] = new_phone
                     
-                    if uname in current_db:
-                        current_db[uname]['name'] = new_name
-                        current_db[uname]['email'] = new_email
-                        current_db[uname]['phone'] = new_phone
-                        if new_pass:
-                            current_db[uname]['password'] = new_pass
-                            st.toast("Ο κωδικός άλλαξε!", icon="🔑")
-                        
-                        # Αποθήκευση στο αρχείο
-                        save_users(current_db)
-                        
-                        # Update session
-                        st.session_state.users_db = current_db
-                        st.session_state.current_user = current_db[uname]
-                        st.success("Ενημερώθηκε!")
-                        time.sleep(1)
-                        st.rerun()
+                    if new_pass:
+                        st.session_state.users_db[uname]['password'] = new_pass
+                        st.toast("Ο κωδικός άλλαξε!", icon="🔑")
+                    
+                    st.session_state.current_user = st.session_state.users_db[uname]
+                    st.success("Ενημερώθηκε!")
+                    time.sleep(1)
+                    st.rerun()
 
     # --------------------------------------------------
     # 6. ΒΟΗΘΕΙΑ & ΥΠΟΣΤΗΡΙΞΗ
@@ -744,14 +708,9 @@ else:
     elif menu_choice == "👥 Διαχείριση Χρηστών":
         if st.session_state.current_user['role'] != 'owner':
              st.stop()
-        
-        # **ΣΗΜΑΝΤΙΚΟ:** Φορτώνουμε τη βάση από την αρχή για να δούμε νέους χρήστες από άλλες συσκευές
-        st.session_state.users_db = load_users()
-        
         st.header("👑 Πίνακας Ελέγχου Owner")
-        st.caption("Διαχείριση εγγεγραμμένων χρηστών (Real-time).")
         
-        with st.expander("➕ Προσθήκη Νέου Χρήστη (Χειροκίνητα)", expanded=True):
+        with st.expander("➕ Προσθήκη Νέου Χρήστη", expanded=True):
             with st.form("create_user"):
                 c1, c2 = st.columns(2)
                 new_u = c1.text_input("Username")
@@ -764,23 +723,20 @@ else:
                 new_role = c6.selectbox("Ρόλος", ["user", "admin"])
                 
                 if st.form_submit_button("Δημιουργία"):
-                    if new_u in st.session_state.users_db:
-                        st.warning("Υπάρχει ήδη.")
-                    else:
-                        st.session_state.users_db[new_u] = {
-                            "password": new_p, 
-                            "role": new_role, 
-                            "name": new_n, 
-                            "email": new_e,
-                            "phone": new_ph
-                        }
-                        save_users(st.session_state.users_db) # Αποθήκευση
-                        st.success("Δημιουργήθηκε!")
-                        st.rerun()
+                    st.session_state.users_db[new_u] = {
+                        "password": new_p, 
+                        "role": new_role, 
+                        "name": new_n, 
+                        "email": new_e,
+                        "phone": new_ph
+                    }
+                    st.success("Δημιουργήθηκε!")
+                    st.rerun()
 
         st.divider()
         st.subheader("📋 Λίστα Εγγεγραμμένων")
         
+        # --- HEADERS ---
         h1, h2, h3, h4, h5, h6 = st.columns([2, 2, 2, 2, 1, 1])
         h1.markdown("**Username**")
         h2.markdown("**Όνομα**")
@@ -790,16 +746,19 @@ else:
         h6.markdown("**Προβολή**")
         st.divider()
 
+        # --- LOOP USERS ---
         for uname, udata in st.session_state.users_db.items():
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 2, 2, 1, 1])
             c1.write(uname)
             c2.write(udata['name'])
             c3.write(udata.get('email', '-'))
             
+            # --- ROLE EDIT LOGIC ---
             r = udata['role']
-            if uname == "GiannisKrv": 
+            if uname == "GiannisKrv": # OWNER - Δεν αλλάζει
                 c4.error("OWNER (Locked)")
             else:
+                # Selectbox για αλλαγή ρόλου
                 current_index = 0 if r == 'user' else 1
                 new_role_sel = c4.selectbox(
                     "Change Role", 
@@ -809,13 +768,14 @@ else:
                     label_visibility="collapsed"
                 )
                 
+                # Αν αλλάξει η επιλογή, κάνε update στη βάση
                 if new_role_sel != r:
                     st.session_state.users_db[uname]['role'] = new_role_sel
-                    save_users(st.session_state.users_db) # Αποθήκευση αλλαγής
                     st.toast(f"Ο ρόλος του {uname} άλλαξε σε {new_role_sel.upper()}!", icon="🔄")
                     time.sleep(0.5)
                     st.rerun()
 
+            # --- PASSWORD TOGGLE ---
             toggle_key = f"vis_{uname}"
             if toggle_key not in st.session_state: st.session_state[toggle_key] = False
             
