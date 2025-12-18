@@ -101,7 +101,6 @@ if 'data_loaded' not in st.session_state:
     load_data()
     st.session_state.data_loaded = True
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
-# Session State για τον Καιρό (ώστε να μένει μόνιμα)
 if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
 
@@ -351,35 +350,33 @@ else:
         st.subheader("🧬 Ρυθμίσεις Καλλιέργειας (GDD)")
         c_crop, c_var, c_base = st.columns(3)
         
-        # Ο χρήστης γράφει ότι θέλει
-        crop_name = c_crop.text_input("Όνομα Καλλιέργειας", value="Βαμβάκι")
-        crop_var = c_var.text_input("Ποικιλία", value="ST-402")
-        tbase = c_base.number_input("Θερμοκρασία Βάσης (Tbase) °C", value=15.6, help="Η ελάχιστη θερμοκρασία που αναπτύσσεται το φυτό.")
+        # Αλλαγή Default: Βάζουμε "Σιτάρι" και "0" για να φαίνεται κάτι τον Χειμώνα
+        crop_name = c_crop.text_input("Όνομα Καλλιέργειας", value="Σιτάρι (Demo Χειμώνα)")
+        crop_var = c_var.text_input("Ποικιλία", value="Skelio")
+        tbase = c_base.number_input("Θερμοκρασία Βάσης (Tbase) °C", value=0.0, help="Η ελάχιστη θερμοκρασία που αναπτύσσεται το φυτό.")
+
+        if tbase > 10:
+            st.caption("⚠️ **Προσοχή:** Έχετε βάλει υψηλό Tbase. Αν είναι Χειμώνας, το GDD θα είναι 0 και το διάγραμμα θα φαίνεται άδειο.")
 
         st.markdown("---")
 
-        # 3. ΚΟΥΜΠΙ ΛΗΨΗΣ (Μόνο για ενημέρωση δεδομένων)
+        # 3. ΚΟΥΜΠΙ ΛΗΨΗΣ
         if st.button("🔄 Ενημέρωση Δεδομένων Καιρού", type="primary"):
             try:
-                # Weather API Call (15 past + 7 forecast days)
                 url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15&timezone=auto"
                 res = requests.get(url).json()
-                
-                # Αποθήκευση στο Session State για να μη χάνονται
                 st.session_state.weather_data = res
                 st.session_state.weather_loc_name = display_name
-                st.rerun() # Επανεκκίνηση για να εμφανιστούν τα δεδομένα
-                
+                st.rerun() 
             except Exception as e:
                 st.error(f"Σφάλμα λήψης δεδομένων: {e}")
 
-        # 4. ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ (Τρέχει πάντα αν υπάρχουν δεδομένα στη μνήμη)
+        # 4. ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ
         if st.session_state.weather_data:
             data = st.session_state.weather_data
             
             st.success(f"📍 Δεδομένα για: **{st.session_state.weather_loc_name}**")
             
-            # Current Weather
             curr = data['current']
             c1, c2, c3 = st.columns(3)
             c1.metric("Θερμοκρασία Τώρα", f"{curr['temperature_2m']} °C")
@@ -400,12 +397,18 @@ else:
                 acc += day_gdd
                 gdd_cum.append(acc)
             
-            # Display Charts
-            st.subheader(f"📈 Ανάπτυξη: {crop_name} ({crop_var})")
+            # Formatting Title safely
+            title_text = f"📈 Ανάπτυξη: {crop_name}"
+            if crop_var: title_text += f" ({crop_var})"
+
+            st.subheader(title_text)
             
             tab_gdd, tab_temp = st.tabs(["🧬 Διάγραμμα GDD", "🌡️ Θερμοκρασίες"])
             
             with tab_gdd:
+                if max(gdd_cum) == 0:
+                    st.warning("⚠️ Το άθροισμα GDD είναι 0. Αυτό είναι φυσιολογικό αν κάνει κρύο και το Tbase είναι υψηλό (π.χ. Βαμβάκι το Χειμώνα).")
+                
                 df_gdd = pd.DataFrame({"Date": dates, "Cumulative GDD": gdd_cum})
                 st.area_chart(df_gdd.set_index("Date"), color="#2e7d32")
                 st.info(f"Συνολικοί Ημεροβαθμοί (Tbase {tbase}°C): **{acc:.1f}**")
