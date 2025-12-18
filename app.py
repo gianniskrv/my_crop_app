@@ -69,17 +69,16 @@ def load_data():
     # Εξασφαλίζουμε ότι ο λογαριασμός GiannisKrv υπάρχει και είναι ΠΑΝΤΑ owner
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
-            "password": "change_me", # Θα κρατήσει τον παλιό αν υπάρχει στο json, αυτό είναι για init
+            "password": "change_me",
             "role": "owner",
             "name": "Γιάννης",
             "email": "johnkrv1@gmail.com",
             "phone": ""
         }
     
-    # ΚΛΕΙΔΩΜΑ: Επιβάλουμε τον ρόλο owner στον GiannisKrv ό,τι και να γίνει
+    # ΚΛΕΙΔΩΜΑ: Επιβάλουμε τον ρόλο owner στον GiannisKrv
     if "GiannisKrv" in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-        # Αν δεν υπάρχει ήδη αρχείο, το σώζουμε τώρα
         if not os.path.exists(FILES["users"]):
             save_data("users")
 
@@ -152,7 +151,7 @@ def register_user(new_user, new_pass, new_name, new_email):
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
-        # Ολοι οι νέοι χρήστες είναι αυστηρά 'user'
+        # Default role: user
         st.session_state.users_db[new_user] = {
             "password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": ""
         }
@@ -260,15 +259,14 @@ else:
     # 📱 MAIN APP (LOGGED IN)
     # ==================================================
     
-    # ΡΥΘΜΙΣΗ ΜΕΝΟΥ: Το Admin panel εμφανίζεται ΜΟΝΟ στον GiannisKrv
     menu_options = ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο", "Καιρός", "Το Προφίλ μου"]
     menu_icons = ["speedometer2", "wallet2", "box-seam", "truck", "calendar-check", "cloud-sun", "person-circle"]
     
-    # --- SECURITY CHECK ΓΙΑ ΤΟ MENU ---
-    # Εμφανίζεται ΜΟΝΟ αν το username είναι ακριβώς 'GiannisKrv'
-    is_owner_account = st.session_state.current_username == "GiannisKrv"
+    # --- ROLE-BASED ACCESS CONTROL (RBAC) ---
+    current_role = st.session_state.current_user.get('role', 'user')
     
-    if is_owner_account:
+    # Πρόσβαση στο μενού έχουν ΜΟΝΟ Owner και Admin
+    if current_role in ['owner', 'admin']:
         menu_options.insert(6, "Διαχείριση Χρηστών")
         menu_icons.insert(6, "people-fill")
     
@@ -277,8 +275,14 @@ else:
 
     with st.sidebar:
         st.markdown(f"### 👤 {st.session_state.current_user['name']}")
-        if is_owner_account:
+        
+        # Display Role Badge
+        if current_role == 'owner':
             st.caption("🔒 OWNER ACCESS")
+        elif current_role == 'admin':
+            st.caption("🛡️ ADMIN ACCESS")
+        else:
+            st.caption("MEMBER")
         
         selected = option_menu(
             menu_title="Μενού",
@@ -471,7 +475,7 @@ else:
         with st.expander("📺 Προβολή"):
             components.iframe("https://www.effispray.com/el", height=600)
 
-    # --- 7. ΠΡΟΦΙΛ (NEW) ---
+    # --- 7. ΠΡΟΦΙΛ ---
     elif selected == "Το Προφίλ μου":
         st.title("👤 Το Προφίλ μου")
         curr_u = st.session_state.current_user
@@ -496,30 +500,30 @@ else:
                 time.sleep(1)
                 st.rerun()
 
-    # --- 8. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY - LOCKED TO GiannisKrv) ---
+    # --- 8. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (OWNER & ADMIN ONLY) ---
     elif selected == "Διαχείριση Χρηστών":
-        # Διπλός έλεγχος ασφαλείας
-        if st.session_state.current_username != "GiannisKrv":
+        if current_role not in ['owner', 'admin']:
             st.error("⛔ Δεν έχετε δικαίωμα πρόσβασης.")
         else:
             st.title("👥 Διαχείριση Εγγεγραμμένων Χρηστών")
-            st.info("Λίστα όλων των χρηστών της εφαρμογής.")
-
-            c1, c2, c3, c4, c5 = st.columns([2, 2, 3, 2, 1])
+            
+            # Επικεφαλίδες
+            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 1])
             c1.markdown("**Username**")
             c2.markdown("**Όνομα**")
             c3.markdown("**Email**")
             c4.markdown("**Κωδικός**")
-            c5.markdown("**Show**")
+            c5.markdown("**Ρόλος (Role)**") # Νέα Στήλη
+            c6.markdown("**View**")
             st.divider()
             
             for uname, udata in st.session_state.users_db.items():
-                c1, c2, c3, c4, c5 = st.columns([2, 2, 3, 2, 1])
+                c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 1])
                 c1.write(uname)
                 c2.write(udata['name'])
                 c3.write(udata['email'])
                 
-                # Logic για εμφάνιση/απόκρυψη κωδικού
+                # Κωδικός με Ματάκι
                 key_vis = f"pass_vis_{uname}"
                 if key_vis not in st.session_state: st.session_state[key_vis] = False
                 
@@ -530,9 +534,43 @@ else:
                     c4.text("••••••••")
                     icon = "👁️"
                 
-                if c5.button(icon, key=f"btn_{uname}"):
+                if c6.button(icon, key=f"btn_{uname}"):
                     st.session_state[key_vis] = not st.session_state[key_vis]
                     st.rerun()
+
+                # --- ROLE MANAGEMENT (ΜΟΝΟ ΓΙΑ OWNER) ---
+                user_role = udata.get('role', 'user')
+                
+                if current_role == 'owner':
+                    # Ο Owner μπορεί να αλλάξει ρόλους (εκτός από τον εαυτό του)
+                    if uname == "GiannisKrv":
+                        c5.success("👑 OWNER")
+                    else:
+                        # Selectbox για αλλαγή ρόλου
+                        new_role = c5.selectbox(
+                            "", 
+                            options=["user", "admin"], 
+                            index=0 if user_role == "user" else 1,
+                            key=f"role_sel_{uname}",
+                            label_visibility="collapsed"
+                        )
+                        
+                        # Αν αλλάξει η τιμή, αποθήκευσε το
+                        if new_role != user_role:
+                            st.session_state.users_db[uname]['role'] = new_role
+                            save_data("users")
+                            st.toast(f"Ο ρόλος του {uname} άλλαξε σε {new_role}!", icon="✅")
+                            time.sleep(1)
+                            st.rerun()
+                else:
+                    # O Admin απλά βλέπει τον ρόλο, δεν αλλάζει
+                    if uname == "GiannisKrv":
+                        c5.success("👑 OWNER")
+                    elif user_role == 'admin':
+                        c5.info("🛡️ ADMIN")
+                    else:
+                        c5.write("USER")
+
                 st.markdown("---")
 
     elif selected == "Logout":
