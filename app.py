@@ -19,10 +19,10 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL (ΕΝΗΜΕΡΩΜΕΝΕΣ)
+# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
 # ==============================================================================
-EMAIL_SENDER = "johnkrv1@gmail.com"
-EMAIL_PASSWORD = "bcgb tdmn sjwe ajnt"
+EMAIL_SENDER = "johnkrv1@gmail.com"  # <--- Βάλε το email σου
+EMAIL_PASSWORD = "bcgb tdmn sjwe ajnt" # <--- Βάλε τον κωδικό εφαρμογής σου
 
 def send_email(receiver, subject, body):
     """Στέλνει email ειδοποίησης"""
@@ -107,6 +107,7 @@ if 'data_loaded' not in st.session_state:
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
+if 'current_username' not in st.session_state: st.session_state.current_username = None
 
 # --- Μεταβλητές για Ανάκτηση Κωδικού ---
 if 'reset_mode' not in st.session_state: st.session_state.reset_mode = False
@@ -121,6 +122,7 @@ def login_user(username, password):
         if st.session_state.users_db[username]['password'] == password:
             st.session_state.authenticated = True
             st.session_state.current_user = st.session_state.users_db[username]
+            st.session_state.current_username = username # Save username key
             st.success(f"Καλωσήρθες {st.session_state.current_user['name']}!")
             time.sleep(0.5)
             st.rerun()
@@ -148,6 +150,8 @@ def register_user(new_user, new_pass, new_name, new_email):
 
 def logout():
     st.session_state.authenticated = False
+    st.session_state.current_user = None
+    st.session_state.current_username = None
     st.rerun()
 
 # ==================================================
@@ -259,12 +263,26 @@ else:
     # ==================================================
     # 📱 MAIN APP (LOGGED IN)
     # ==================================================
+    
+    # Διαμόρφωση Μενού ανάλογα με τον ρόλο
+    menu_options = ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο", "Καιρός", "Το Προφίλ μου"]
+    menu_icons = ["speedometer2", "wallet2", "box-seam", "truck", "calendar-check", "cloud-sun", "person-circle"]
+    
+    # Αν είναι Owner, πρόσθεσε τη Διαχείριση Χρηστών
+    is_owner = st.session_state.current_user.get('role') == 'owner'
+    if is_owner:
+        menu_options.insert(6, "Διαχείριση Χρηστών")
+        menu_icons.insert(6, "people-fill")
+    
+    menu_options.append("Logout")
+    menu_icons.append("box-arrow-right")
+
     with st.sidebar:
         st.markdown(f"### 👤 {st.session_state.current_user['name']}")
         selected = option_menu(
             menu_title="Μενού",
-            options=["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο", "Καιρός", "Logout"],
-            icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check", "cloud-sun", "box-arrow-right"],
+            options=menu_options,
+            icons=menu_icons,
             menu_icon="cast", default_index=0,
             styles={"nav-link-selected": {"background-color": "#2e7d32"}}
         )
@@ -432,12 +450,11 @@ else:
                     time.sleep(0.5)
                     st.rerun()
 
-    # --- 6. WEATHER (UPDATED - EFFISPRAY ADDED) ---
+    # --- 6. WEATHER (UPDATED) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
         st.caption("Πηγή Δεδομένων: Open-Meteo (Copernicus, NOAA)")
         
-        # 1. ΕΠΙΛΟΓΗ ΤΟΠΟΘΕΣΙΑΣ
         mode = st.radio("Τρόπος Επιλογής Τοποθεσίας:", ["🔍 Αναζήτηση Πόλης", "📍 Συντεταγμένες"], horizontal=True)
         
         lat, lon = 39.6390, 22.4191
@@ -470,7 +487,6 @@ else:
 
         st.divider()
 
-        # 2. ΡΥΘΜΙΣΕΙΣ ΚΑΛΛΙΕΡΓΕΙΑΣ
         st.subheader("🧬 Ρυθμίσεις Καλλιέργειας (GDD)")
         c_crop, c_var, c_base = st.columns(3)
         crop_name = c_crop.text_input("Όνομα Καλλιέργειας", value="Σιτάρι (Demo Χειμώνα)")
@@ -482,7 +498,6 @@ else:
 
         st.markdown("---")
 
-        # 3. ΚΟΥΜΠΙ ΛΗΨΗΣ
         if st.button("🔄 Ενημέρωση Δεδομένων Καιρού", type="primary"):
             try:
                 url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15&timezone=auto"
@@ -493,7 +508,6 @@ else:
             except Exception as e:
                 st.error(f"Σφάλμα λήψης δεδομένων: {e}")
 
-        # 4. ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ
         if st.session_state.weather_data:
             data = st.session_state.weather_data
             
@@ -505,7 +519,6 @@ else:
             c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
             c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
 
-            # GDD Calculation
             daily = data['daily']
             dates = daily['time']
             tmax = daily['temperature_2m_max']
@@ -544,7 +557,6 @@ else:
         else:
             st.info("Πατήστε 'Ενημέρωση Δεδομένων' για να δείτε την πρόγνωση.")
 
-        # --- 5. ΕΞΩΤΕΡΙΚΑ ΕΡΓΑΛΕΙΑ (EFFISPRAY) ---
         st.divider()
         st.subheader("🛠️ Εξωτερικά Εργαλεία & Βελτιστοποίηση")
         
@@ -553,11 +565,82 @@ else:
             with col_tool_desc:
                 st.markdown("### 🚜 EffiSpray")
                 st.write("Το EffiSpray είναι ένα έξυπνο εργαλείο που σας βοηθά να βελτιστοποιήσετε τους ψεκασμούς σας, μειώνοντας το κόστος και βελτιώνοντας την αποτελεσματικότητα.")
-                
                 st.link_button("🌐 Μετάβαση στο EffiSpray.com", "https://www.effispray.com/el")
-                
                 with st.expander("📺 Προβολή EffiSpray εδώ (Εντός εφαρμογής)"):
                     components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
+
+    # --- 7. ΠΡΟΦΙΛ (NEW) ---
+    elif selected == "Το Προφίλ μου":
+        st.title("👤 Το Προφίλ μου")
+        
+        # Βρίσκουμε το username του τρέχοντος χρήστη με ασφάλεια
+        curr_u = st.session_state.current_user
+        curr_uname = st.session_state.current_username
+        
+        with st.form("edit_profile"):
+            c1, c2 = st.columns(2)
+            new_name = c1.text_input("Ονοματεπώνυμο", value=curr_u['name'])
+            new_email = c2.text_input("Email", value=curr_u['email'])
+            new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
+            
+            st.markdown("---")
+            st.caption("Αφήστε κενό αν δεν θέλετε να αλλάξετε τον κωδικό.")
+            new_pass = st.text_input("Νέος Κωδικός", type="password")
+            
+            if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                st.session_state.users_db[curr_uname]['name'] = new_name
+                st.session_state.users_db[curr_uname]['email'] = new_email
+                st.session_state.users_db[curr_uname]['phone'] = new_phone
+                if new_pass:
+                    st.session_state.users_db[curr_uname]['password'] = new_pass
+                
+                save_data("users")
+                # Update Session Current User Object
+                st.session_state.current_user = st.session_state.users_db[curr_uname]
+                st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
+                time.sleep(1)
+                st.rerun()
+
+    # --- 8. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY) ---
+    elif selected == "Διαχείριση Χρηστών":
+        # Extra Security Check
+        if st.session_state.current_user.get('role') != 'owner':
+            st.error("⛔ Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα.")
+        else:
+            st.title("👥 Διαχείριση Εγγεγραμμένων Χρηστών")
+            st.info("Εδώ βλέπετε όλους τους χρήστες. Πατήστε το 👁️ για να δείτε τον κωδικό.")
+
+            # Table Header
+            c1, c2, c3, c4, c5 = st.columns([2, 2, 3, 2, 1])
+            c1.markdown("**Username**")
+            c2.markdown("**Όνομα**")
+            c3.markdown("**Email**")
+            c4.markdown("**Κωδικός**")
+            c5.markdown("**Show**")
+            st.divider()
+            
+            for uname, udata in st.session_state.users_db.items():
+                c1, c2, c3, c4, c5 = st.columns([2, 2, 3, 2, 1])
+                c1.write(uname)
+                c2.write(udata['name'])
+                c3.write(udata['email'])
+                
+                # Logic για εμφάνιση/απόκρυψη κωδικού
+                key_vis = f"pass_vis_{uname}"
+                if key_vis not in st.session_state: st.session_state[key_vis] = False
+                
+                if st.session_state[key_vis]:
+                    c4.warning(udata['password']) # Εμφανής
+                    icon = "🙈"
+                else:
+                    c4.text("••••••••") # Κρυμμένος
+                    icon = "👁️"
+                
+                if c5.button(icon, key=f"btn_{uname}"):
+                    st.session_state[key_vis] = not st.session_state[key_vis]
+                    st.rerun()
+                
+                st.markdown("---")
 
     elif selected == "Logout":
         logout()
