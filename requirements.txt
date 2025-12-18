@@ -1,4 +1,6 @@
 streamlit
-wikipedia
 pandas
+plotly
 requests
+streamlit-option-menu
+fpdf
