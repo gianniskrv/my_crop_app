@@ -306,68 +306,57 @@ else:
                     time.sleep(0.5)
                     st.rerun()
 
-    # --- 6. WEATHER (UPDATED) ---
+    # --- 6. WEATHER (UPDATED WITH GDD CHART) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
         
         # ΕΠΙΛΟΓΗ ΤΡΟΠΟΥ ΑΝΑΖΗΤΗΣΗΣ
         mode = st.radio("Τρόπος Επιλογής Τοποθεσίας:", ["🔍 Αναζήτηση Πόλης", "📍 Συντεταγμένες"], horizontal=True)
         
-        # Default Τιμές (Λάρισα)
         lat, lon = 39.6390, 22.4191
         display_name = "Λάρισα (Default)"
 
         if mode == "🔍 Αναζήτηση Πόλης":
-            search_city = st.text_input("Πληκτρολογήστε πόλη (π.χ. Λάρισα, Θεσσαλονίκη)")
+            search_city = st.text_input("Πληκτρολογήστε πόλη (π.χ. Λάρισα)")
             if search_city:
                 try:
-                    # Geocoding API Call (Open-Meteo)
                     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={search_city}&count=5&language=el&format=json"
                     geo_res = requests.get(geo_url).json()
-                    
                     if "results" in geo_res and geo_res['results']:
                         results = geo_res['results']
-                        # Φτιάχνουμε λίστα επιλογών για το Dropdown
                         city_options = {}
                         for r in results:
                             label = f"{r['name']}, {r.get('country', '')} ({r.get('admin1', '')})"
                             city_options[label] = r
-                        
                         selected_city_label = st.selectbox("Επιλέξτε τη σωστή τοποθεσία:", list(city_options.keys()))
-                        
                         if selected_city_label:
                             sel_data = city_options[selected_city_label]
                             lat = sel_data['latitude']
                             lon = sel_data['longitude']
                             display_name = selected_city_label
                             st.success(f"📍 Επιλέχθηκε: **{display_name}**")
-                    else:
-                        st.warning("Δεν βρέθηκε η πόλη. Δοκιμάστε με λατινικούς χαρακτήρες αν υπάρχει πρόβλημα.")
-                except Exception as e:
-                    st.error(f"Σφάλμα σύνδεσης: {e}")
+                    else: st.warning("Δεν βρέθηκε η πόλη.")
+                except Exception as e: st.error(f"Σφάλμα σύνδεσης: {e}")
         else:
-            # Manual Coords
             col1, col2 = st.columns(2)
             lat = col1.number_input("Latitude", value=39.6390, format="%.4f")
             lon = col2.number_input("Longitude", value=22.4191, format="%.4f")
-            display_name = f"{lat}, {lon}"
 
         st.divider()
 
         if st.button("🔄 Λήψη Πρόγνωσης"):
             try:
-                # Weather API Call
+                # Weather API Call (10 past + 7 forecast days)
                 url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=10&timezone=auto"
                 res = requests.get(url).json()
                 
-                # Current Weather
                 curr = res['current']
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Θερμοκρασία", f"{curr['temperature_2m']} °C")
                 c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
                 c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
                 
-                # Chart
+                # Temperature Chart
                 st.subheader("📈 Θερμοκρασία (Max/Min)")
                 daily = res['daily']
                 df_w = pd.DataFrame({
@@ -376,6 +365,42 @@ else:
                     "Min Temp": daily['temperature_2m_min']
                 })
                 st.line_chart(df_w.set_index("Date"))
+                
+                # --- NEW: GDD CHART SECTION ---
+                st.divider()
+                st.subheader("🧬 Υπολογιστής GDD (Growing Degree Days)")
+                st.caption("Επιλέξτε καλλιέργεια για να δείτε το διάγραμμα ανάπτυξης.")
+
+                col_g1, col_g2 = st.columns(2)
+                crop_sel = col_g1.selectbox("Καλλιέργεια", ["Βαμβάκι (Tbase 15.6)", "Καλαμπόκι (Tbase 10)", "Σιτάρι (Tbase 0)", "Custom"])
+                
+                tbase = 10.0
+                if "Βαμβάκι" in crop_sel: tbase = 15.6
+                elif "Καλαμπόκι" in crop_sel: tbase = 10.0
+                elif "Σιτάρι" in crop_sel: tbase = 0.0
+                elif "Custom" in crop_sel: tbase = col_g2.number_input("Ορισμός Tbase (°C)", value=10.0)
+                
+                if not "Custom" in crop_sel:
+                    col_g2.info(f"Θερμοκρασία Βάσης (Tbase): **{tbase} °C**")
+
+                # GDD Calculation Logic
+                dates = daily['time']
+                tmax = daily['temperature_2m_max']
+                tmin = daily['temperature_2m_min']
+                
+                gdd_cum = []
+                acc = 0
+                for i in range(len(dates)):
+                    # Formula: ((Tmax + Tmin) / 2) - Tbase
+                    avg_t = (tmax[i] + tmin[i]) / 2
+                    day_gdd = max(avg_t - tbase, 0)
+                    acc += day_gdd
+                    gdd_cum.append(acc)
+                
+                # GDD Area Chart
+                df_gdd = pd.DataFrame({"Date": dates, "Cumulative GDD": gdd_cum})
+                st.area_chart(df_gdd.set_index("Date"), color="#2e7d32") # Green color for growth
+                st.success(f"Συνολικοί Ημεροβαθμοί (τελευταίες 10 μέρες + πρόβλεψη): **{acc:.1f}**")
                 
             except Exception as e:
                 st.error(f"Σφάλμα λήψης δεδομένων καιρού: {e}")
