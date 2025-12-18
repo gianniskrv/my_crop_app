@@ -101,6 +101,9 @@ if 'data_loaded' not in st.session_state:
     load_data()
     st.session_state.data_loaded = True
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
+# Session State για τον Καιρό (ώστε να μένει μόνιμα)
+if 'weather_data' not in st.session_state: st.session_state.weather_data = None
+if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
 
 def login_user(username, password):
     if username in st.session_state.users_db:
@@ -306,11 +309,12 @@ else:
                     time.sleep(0.5)
                     st.rerun()
 
-    # --- 6. WEATHER (UPDATED WITH GDD CHART) ---
+    # --- 6. WEATHER (UPDATED - PERSISTENT & CUSTOM CROP) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
+        st.caption("Πηγή Δεδομένων: Open-Meteo (Copernicus, NOAA)")
         
-        # ΕΠΙΛΟΓΗ ΤΡΟΠΟΥ ΑΝΑΖΗΤΗΣΗΣ
+        # 1. ΕΠΙΛΟΓΗ ΤΟΠΟΘΕΣΙΑΣ
         mode = st.radio("Τρόπος Επιλογής Τοποθεσίας:", ["🔍 Αναζήτηση Πόλης", "📍 Συντεταγμένες"], horizontal=True)
         
         lat, lon = 39.6390, 22.4191
@@ -334,7 +338,6 @@ else:
                             lat = sel_data['latitude']
                             lon = sel_data['longitude']
                             display_name = selected_city_label
-                            st.success(f"📍 Επιλέχθηκε: **{display_name}**")
                     else: st.warning("Δεν βρέθηκε η πόλη.")
                 except Exception as e: st.error(f"Σφάλμα σύνδεσης: {e}")
         else:
@@ -344,66 +347,78 @@ else:
 
         st.divider()
 
-        if st.button("🔄 Λήψη Πρόγνωσης"):
+        # 2. ΡΥΘΜΙΣΕΙΣ ΚΑΛΛΙΕΡΓΕΙΑΣ (CUSTOM INPUTS)
+        st.subheader("🧬 Ρυθμίσεις Καλλιέργειας (GDD)")
+        c_crop, c_var, c_base = st.columns(3)
+        
+        # Ο χρήστης γράφει ότι θέλει
+        crop_name = c_crop.text_input("Όνομα Καλλιέργειας", value="Βαμβάκι")
+        crop_var = c_var.text_input("Ποικιλία", value="ST-402")
+        tbase = c_base.number_input("Θερμοκρασία Βάσης (Tbase) °C", value=15.6, help="Η ελάχιστη θερμοκρασία που αναπτύσσεται το φυτό.")
+
+        st.markdown("---")
+
+        # 3. ΚΟΥΜΠΙ ΛΗΨΗΣ (Μόνο για ενημέρωση δεδομένων)
+        if st.button("🔄 Ενημέρωση Δεδομένων Καιρού", type="primary"):
             try:
-                # Weather API Call (10 past + 7 forecast days)
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=10&timezone=auto"
+                # Weather API Call (15 past + 7 forecast days)
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15&timezone=auto"
                 res = requests.get(url).json()
                 
-                curr = res['current']
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Θερμοκρασία", f"{curr['temperature_2m']} °C")
-                c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
-                c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
-                
-                # Temperature Chart
-                st.subheader("📈 Θερμοκρασία (Max/Min)")
-                daily = res['daily']
-                df_w = pd.DataFrame({
-                    "Date": daily['time'], 
-                    "Max Temp": daily['temperature_2m_max'],
-                    "Min Temp": daily['temperature_2m_min']
-                })
-                st.line_chart(df_w.set_index("Date"))
-                
-                # --- NEW: GDD CHART SECTION ---
-                st.divider()
-                st.subheader("🧬 Υπολογιστής GDD (Growing Degree Days)")
-                st.caption("Επιλέξτε καλλιέργεια για να δείτε το διάγραμμα ανάπτυξης.")
-
-                col_g1, col_g2 = st.columns(2)
-                crop_sel = col_g1.selectbox("Καλλιέργεια", ["Βαμβάκι (Tbase 15.6)", "Καλαμπόκι (Tbase 10)", "Σιτάρι (Tbase 0)", "Custom"])
-                
-                tbase = 10.0
-                if "Βαμβάκι" in crop_sel: tbase = 15.6
-                elif "Καλαμπόκι" in crop_sel: tbase = 10.0
-                elif "Σιτάρι" in crop_sel: tbase = 0.0
-                elif "Custom" in crop_sel: tbase = col_g2.number_input("Ορισμός Tbase (°C)", value=10.0)
-                
-                if not "Custom" in crop_sel:
-                    col_g2.info(f"Θερμοκρασία Βάσης (Tbase): **{tbase} °C**")
-
-                # GDD Calculation Logic
-                dates = daily['time']
-                tmax = daily['temperature_2m_max']
-                tmin = daily['temperature_2m_min']
-                
-                gdd_cum = []
-                acc = 0
-                for i in range(len(dates)):
-                    # Formula: ((Tmax + Tmin) / 2) - Tbase
-                    avg_t = (tmax[i] + tmin[i]) / 2
-                    day_gdd = max(avg_t - tbase, 0)
-                    acc += day_gdd
-                    gdd_cum.append(acc)
-                
-                # GDD Area Chart
-                df_gdd = pd.DataFrame({"Date": dates, "Cumulative GDD": gdd_cum})
-                st.area_chart(df_gdd.set_index("Date"), color="#2e7d32") # Green color for growth
-                st.success(f"Συνολικοί Ημεροβαθμοί (τελευταίες 10 μέρες + πρόβλεψη): **{acc:.1f}**")
+                # Αποθήκευση στο Session State για να μη χάνονται
+                st.session_state.weather_data = res
+                st.session_state.weather_loc_name = display_name
+                st.rerun() # Επανεκκίνηση για να εμφανιστούν τα δεδομένα
                 
             except Exception as e:
-                st.error(f"Σφάλμα λήψης δεδομένων καιρού: {e}")
+                st.error(f"Σφάλμα λήψης δεδομένων: {e}")
+
+        # 4. ΕΜΦΑΝΙΣΗ ΔΕΔΟΜΕΝΩΝ (Τρέχει πάντα αν υπάρχουν δεδομένα στη μνήμη)
+        if st.session_state.weather_data:
+            data = st.session_state.weather_data
+            
+            st.success(f"📍 Δεδομένα για: **{st.session_state.weather_loc_name}**")
+            
+            # Current Weather
+            curr = data['current']
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Θερμοκρασία Τώρα", f"{curr['temperature_2m']} °C")
+            c2.metric("Υγρασία", f"{curr['relative_humidity_2m']} %")
+            c3.metric("Βροχόπτωση", f"{curr['precipitation']} mm")
+
+            # --- GDD CALCULATION ---
+            daily = data['daily']
+            dates = daily['time']
+            tmax = daily['temperature_2m_max']
+            tmin = daily['temperature_2m_min']
+            
+            gdd_cum = []
+            acc = 0
+            for i in range(len(dates)):
+                avg_t = (tmax[i] + tmin[i]) / 2
+                day_gdd = max(avg_t - tbase, 0)
+                acc += day_gdd
+                gdd_cum.append(acc)
+            
+            # Display Charts
+            st.subheader(f"📈 Ανάπτυξη: {crop_name} ({crop_var})")
+            
+            tab_gdd, tab_temp = st.tabs(["🧬 Διάγραμμα GDD", "🌡️ Θερμοκρασίες"])
+            
+            with tab_gdd:
+                df_gdd = pd.DataFrame({"Date": dates, "Cumulative GDD": gdd_cum})
+                st.area_chart(df_gdd.set_index("Date"), color="#2e7d32")
+                st.info(f"Συνολικοί Ημεροβαθμοί (Tbase {tbase}°C): **{acc:.1f}**")
+            
+            with tab_temp:
+                df_w = pd.DataFrame({
+                    "Date": dates, 
+                    "Max Temp": tmax,
+                    "Min Temp": tmin
+                })
+                st.line_chart(df_w.set_index("Date"))
+        else:
+            st.info("Πατήστε 'Ενημέρωση Δεδομένων' για να δείτε την πρόγνωση.")
 
     elif selected == "Logout":
         logout()
