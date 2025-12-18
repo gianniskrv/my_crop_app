@@ -10,13 +10,45 @@ import time
 import json
 import os
 from fpdf import FPDF
-import base64
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 # --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 💾 DATABASE SYSTEM (ΜΟΝΙΜΗ ΑΠΟΘΗΚΕΥΣΗ)
+# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL (ΣΥΜΠΛΗΡΩΣΕ ΤΑ ΕΔΩ ΜΟΝΟΣ ΣΟΥ)
+# ==============================================================================
+# 👇 ΣΒΗΣΕ ΤΑ ΕΛΛΗΝΙΚΑ ΚΑΙ ΒΑΛΕ ΤΑ ΔΙΚΑ ΣΟΥ ΜΕΣΑ ΣΤΑ ΑΥΤΑΚΙΑ ""
+EMAIL_SENDER = "johnkrv1@gmail.com" 
+EMAIL_PASSWORD = "bcgb tdmn sjwe ajnt" 
+
+def send_email(receiver, subject, body):
+    """Στέλνει email ειδοποίησης"""
+    # Αν ο χρήστης δεν έχει βάλει κωδικούς, να μην σκάει η εφαρμογή
+    if "ΤΟ_EMAIL" in EMAIL_SENDER or "ΚΩΔΙΚΟΣ" in EMAIL_PASSWORD:
+        st.toast("⚠️ Το Email δεν έχει ρυθμιστεί στον κώδικα.", icon="📧")
+        return False
+
+    try:
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg['Subject'] = subject
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = receiver
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
+            smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Email Error: {e}")
+        return False
+
+# ==============================================================================
+# 💾 DATABASE SYSTEM
 # ==============================================================================
 FILES = {
     "users": "users.json",
@@ -27,25 +59,20 @@ FILES = {
     "calendar": "calendar.json"
 }
 
-# --- ΒΟΗΘΗΤΙΚΕΣ ΣΥΝΑΡΤΗΣΕΙΣ ---
 def date_handler(obj):
     if isinstance(obj, (datetime, date)): return obj.isoformat()
     return obj
 
 def load_data():
-    # 1. Users
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else:
-        # Δημιουργία αρχικού χρήστη αν δεν υπάρχει το αρχείο
         st.session_state.users_db = {"GiannisKrv": {"password": "21041414", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}}
         save_data("users")
 
-    # 2. History & Expenses & Others
     for key, file_path in FILES.items():
         if key == "users": continue
         state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
-        
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -59,29 +86,9 @@ def load_data():
 def save_data(key):
     target_file = FILES.get(key)
     state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
-    
     if target_file and state_key in st.session_state:
         with open(target_file, 'w', encoding='utf-8') as f:
             json.dump(st.session_state[state_key], f, default=date_handler, indent=4, ensure_ascii=False)
-
-# --- PDF GENERATOR ---
-def create_pdf(dataframe, title):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=title, ln=1, align='C')
-    pdf.ln(10)
-    col_width = pdf.w / 4.5
-    row_height = 10
-    headers = [str(c) for c in dataframe.columns]
-    for h in headers:
-        pdf.cell(col_width, row_height, h[:10], border=1)
-    pdf.ln(row_height)
-    for index, row in dataframe.iterrows():
-        for item in row:
-            pdf.cell(col_width, row_height, str(item)[:10], border=1)
-        pdf.ln(row_height)
-    return pdf.output(dest='S').encode('latin-1', 'ignore')
 
 # ==============================================================================
 # 🎨 DESIGN & CSS
@@ -121,18 +128,44 @@ def register_user(new_user, new_pass, new_name, new_email):
     if new_user in st.session_state.users_db:
         st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
+        # 1. Αποθήκευση
         st.session_state.users_db[new_user] = {
             "password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": ""
         }
-        save_data("users") # ΑΠΟΘΗΚΕΥΣΗ ΣΤΟ ΑΡΧΕΙΟ ΓΙΑ ΝΑ ΜΗ ΧΑΝΕΤΑΙ
-        st.success("Ο λογαριασμός δημιουργήθηκε! Τώρα μπορείτε να συνδεθείτε.")
+        save_data("users")
+        
+        # 2. Email στον Χρήστη (Επιβεβαίωση)
+        user_subject = "🌱 Καλωσήρθες στο AgroManager Pro"
+        user_body = f"""Γεια σου {new_name},
+
+Ο λογαριασμός σου δημιουργήθηκε με επιτυχία!
+
+Στοιχεία Σύνδεσης:
+Username: {new_user}
+Password: {new_pass}
+
+Μπορείς να συνδεθείς τώρα στην εφαρμογή.
+"""
+        send_email(new_email, user_subject, user_body)
+
+        # 3. Email στον Admin (Ειδοποίηση)
+        admin_subject = "🔔 Νέα Εγγραφή Χρήστη"
+        admin_body = f"""Νέος χρήστης εγγράφηκε στο σύστημα.
+
+Όνομα: {new_name}
+Username: {new_user}
+Email: {new_email}
+"""
+        send_email(EMAIL_SENDER, admin_subject, admin_body)
+
+        st.success("Ο λογαριασμός δημιουργήθηκε! Εστάλη email επιβεβαίωσης.")
 
 def logout():
     st.session_state.authenticated = False
     st.rerun()
 
 # ==================================================
-# 🔐 LOGIN / REGISTER SCREEN (UPDATED)
+# 🔐 LOGIN / REGISTER SCREEN
 # ==================================================
 if not st.session_state.authenticated:
     c1, c2, c3 = st.columns([1, 2, 1])
@@ -149,19 +182,20 @@ if not st.session_state.authenticated:
                 if st.button("Είσοδος", use_container_width=True):
                     login_user(username, password)
 
-            # --- TAB: REGISTER (ΜΟΝΙΜΗ ΕΓΓΡΑΦΗ) ---
+            # --- TAB: REGISTER ---
             with tab_register:
                 st.markdown("##### Δημιουργία Νέου Λογαριασμού")
                 new_user = st.text_input("Επιθυμητό Username", key="reg_user")
                 new_pass = st.text_input("Κωδικός Πρόσβασης", type="password", key="reg_pass")
                 new_name = st.text_input("Ονοματεπώνυμο", key="reg_name")
-                new_email = st.text_input("Email (προαιρετικό)", key="reg_email")
+                new_email = st.text_input("Email (Υποχρεωτικό)", key="reg_email")
                 
                 if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
-                    if new_user and new_pass and new_name:
-                        register_user(new_user, new_pass, new_name, new_email)
+                    if new_user and new_pass and new_name and new_email:
+                        with st.spinner("Δημιουργία λογαριασμού & αποστολή email..."):
+                            register_user(new_user, new_pass, new_name, new_email)
                     else:
-                        st.error("Παρακαλώ συμπληρώστε Username, Κωδικό και Όνομα.")
+                        st.error("Παρακαλώ συμπληρώστε όλα τα πεδία (συμπεριλαμβανομένου του Email).")
 
 else:
     # ==================================================
