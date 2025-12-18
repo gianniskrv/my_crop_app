@@ -4,7 +4,7 @@ import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
-import streamlit.components.v1 as components  # <--- ΠΡΟΣΘΗΚΗ ΓΙΑ ΤΟ EFFISPRAY
+import streamlit.components.v1 as components
 from datetime import date, datetime, timedelta
 import time
 import json
@@ -37,6 +37,7 @@ def load_data():
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else:
+        # Δημιουργία αρχικού χρήστη αν δεν υπάρχει το αρχείο
         st.session_state.users_db = {"GiannisKrv": {"password": "21041414", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}}
         save_data("users")
 
@@ -116,22 +117,52 @@ def login_user(username, password):
         else: st.error("Λάθος κωδικός.")
     else: st.error("Ο χρήστης δεν βρέθηκε.")
 
+def register_user(new_user, new_pass, new_name, new_email):
+    if new_user in st.session_state.users_db:
+        st.warning("Το όνομα χρήστη υπάρχει ήδη.")
+    else:
+        st.session_state.users_db[new_user] = {
+            "password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": ""
+        }
+        save_data("users") # ΑΠΟΘΗΚΕΥΣΗ ΣΤΟ ΑΡΧΕΙΟ ΓΙΑ ΝΑ ΜΗ ΧΑΝΕΤΑΙ
+        st.success("Ο λογαριασμός δημιουργήθηκε! Τώρα μπορείτε να συνδεθείτε.")
+
 def logout():
     st.session_state.authenticated = False
     st.rerun()
 
 # ==================================================
-# 🔐 LOGIN SCREEN
+# 🔐 LOGIN / REGISTER SCREEN (UPDATED)
 # ==================================================
 if not st.session_state.authenticated:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🌱 AgroManager Pro</h1>", unsafe_allow_html=True)
+        
         with st.container(border=True):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Είσοδος", use_container_width=True):
-                login_user(username, password)
+            tab_login, tab_register = st.tabs(["🔑 Σύνδεση", "📝 Νέα Εγγραφή"])
+            
+            # --- TAB: LOGIN ---
+            with tab_login:
+                username = st.text_input("Username", key="login_user")
+                password = st.text_input("Password", type="password", key="login_pass")
+                if st.button("Είσοδος", use_container_width=True):
+                    login_user(username, password)
+
+            # --- TAB: REGISTER (ΜΟΝΙΜΗ ΕΓΓΡΑΦΗ) ---
+            with tab_register:
+                st.markdown("##### Δημιουργία Νέου Λογαριασμού")
+                new_user = st.text_input("Επιθυμητό Username", key="reg_user")
+                new_pass = st.text_input("Κωδικός Πρόσβασης", type="password", key="reg_pass")
+                new_name = st.text_input("Ονοματεπώνυμο", key="reg_name")
+                new_email = st.text_input("Email (προαιρετικό)", key="reg_email")
+                
+                if st.button("Δημιουργία Λογαριασμού", use_container_width=True):
+                    if new_user and new_pass and new_name:
+                        register_user(new_user, new_pass, new_name, new_email)
+                    else:
+                        st.error("Παρακαλώ συμπληρώστε Username, Κωδικό και Όνομα.")
+
 else:
     # ==================================================
     # 📱 MAIN APP
@@ -431,10 +462,8 @@ else:
                 st.markdown("### 🚜 EffiSpray")
                 st.write("Το EffiSpray είναι ένα έξυπνο εργαλείο που σας βοηθά να βελτιστοποιήσετε τους ψεκασμούς σας, μειώνοντας το κόστος και βελτιώνοντας την αποτελεσματικότητα.")
                 
-                # Κουμπί για άνοιγμα σε νέο tab
                 st.link_button("🌐 Μετάβαση στο EffiSpray.com", "https://www.effispray.com/el")
                 
-                # Επιλογή για Embed (Iframe)
                 with st.expander("📺 Προβολή EffiSpray εδώ (Εντός εφαρμογής)"):
                     components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
