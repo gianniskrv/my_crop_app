@@ -20,6 +20,21 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
+# 🧬 ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (FAO & UNIVERSITY STANDARDS)
+# ==============================================================================
+CROP_STANDARDS = {
+    "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200, "desc": "Υψηλές απαιτήσεις θερμότητας"},
+    "Καλαμπόκι (FAO 600-700)": {"tbase": 10.0, "target_gdd": 1700, "desc": "Μέσο-όψιμες ποικιλίες"},
+    "Καλαμπόκι (FAO 300-400)": {"tbase": 10.0, "target_gdd": 1400, "desc": "Πρώιμες ποικιλίες"},
+    "Σιτάρι (Σκληρό)": {"tbase": 0.0, "target_gdd": 2100, "desc": "Χειμερινό σιτηρό"},
+    "Σιτάρι (Μαλακό)": {"tbase": 0.0, "target_gdd": 2000, "desc": "Χειμερινό σιτηρό"},
+    "Βιομηχανική Τομάτα": {"tbase": 10.0, "target_gdd": 1450, "desc": "Καλοκαιρινή"},
+    "Μηδική (Ανά κοπή)": {"tbase": 5.0, "target_gdd": 450, "desc": "Θερμότητα ανά κύκλο κοπής"},
+    "Ηλίανθος": {"tbase": 6.0, "target_gdd": 1600, "desc": "Ανθεκτικό στο κρύο"},
+    "Custom (Ορίστε εσείς)": {"tbase": 10.0, "target_gdd": 2000, "desc": "Χειροκίνητη ρύθμιση"}
+}
+
+# ==============================================================================
 # 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
@@ -61,11 +76,10 @@ def load_data():
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else: st.session_state.users_db = {}
 
-    # --- SECURITY: LOCK GIANNISKRV AS OWNER ---
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
     
-    # Force Role Owner every time app loads
+    # Force Owner Role
     st.session_state.users_db["GiannisKrv"]["role"] = "owner"
     
     if not os.path.exists(FILES["users"]): save_data("users")
@@ -386,13 +400,12 @@ else:
             c2.metric("Υγρασία", f"{curr.get('relative_humidity_2m', '-')} %")
             c3.metric("Βροχή", f"{curr.get('precipitation', '-')} mm")
             c4.metric("Άνεμος", f"{curr.get('wind_speed_10m', '-')} km/h")
-            
             daily = d.get('daily', {})
             if daily:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS (VRT CUSTOM CROP & VARIETY ADDED) ---
+    # --- GDD & TOOLS (NEW DB INTEGRATED) ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
@@ -402,11 +415,34 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            c_crop, c_var, c_base = st.columns(3)
-            crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι")
-            crop_var = c_var.text_input("Ποικιλία", "Skelio")
-            tbase = c_base.number_input("Tbase", 0.0)
+            # 1. GDD Calculator with Database
+            st.subheader("🧬 Υπολογισμός GDD")
+            st.caption("Επιλέξτε καλλιέργεια για να δείτε την πρόοδο ανάπτυξης.")
             
+            c_crop, c_var = st.columns(2)
+            
+            # Dropdown from DB
+            selected_crop_key = c_crop.selectbox("Επιλέξτε Καλλιέργεια", list(CROP_STANDARDS.keys()))
+            crop_data = CROP_STANDARDS[selected_crop_key]
+            
+            # Variety Input (User defined)
+            variety_name = c_var.text_input("Ποικιλία / Υβρίδιο", value="Standard")
+            
+            # Show Params
+            c1, c2 = st.columns(2)
+            
+            # If Custom, allow editing Tbase
+            if "Custom" in selected_crop_key:
+                tbase = c1.number_input("Θερμοκρασία Βάσης (Tbase)", value=crop_data['tbase'])
+                target_gdd = c2.number_input("Στόχος GDD (Ωρίμανση)", value=crop_data['target_gdd'])
+            else:
+                # Read-only info for standard crops
+                tbase = crop_data['tbase']
+                target_gdd = crop_data['target_gdd']
+                c1.info(f"Tbase: **{tbase}°C**")
+                c2.info(f"Στόχος GDD: **{target_gdd}**")
+
+            # Calc
             dates = daily['time']
             gdd_cum, acc = [], 0
             for i in range(len(dates)):
@@ -414,33 +450,34 @@ else:
                 acc += max(avg - tbase, 0)
                 gdd_cum.append(acc)
             
-            st.area_chart(pd.DataFrame({"Date": dates, "GDD": gdd_cum}).set_index("Date"), color="#2e7d32")
-            st.info(f"Σύνολο GDD: {acc:.1f}")
+            # Chart
+            df_gdd = pd.DataFrame({"Date": dates, "GDD": gdd_cum})
+            
+            # Add Target Line
+            fig = px.area(df_gdd, x='Date', y='GDD', title=f"Πρόοδος: {selected_crop_key} ({variety_name})", color_discrete_sequence=['#2e7d32'])
+            fig.add_hline(y=target_gdd, line_dash="dot", annotation_text="Στόχος Ωρίμανσης", annotation_position="bottom right", line_color="red")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.info(f"Συνολικοί Βαθμοί (Τελευταίες 15 μέρες): **{acc:.1f}**")
 
             st.divider()
             
-            # --- VRT CALCULATOR UPDATE ---
+            # --- VRT CALCULATOR ---
             st.subheader("🧪 VRT Λίπανση")
             with st.container(border=True):
                 v1, v2 = st.columns(2)
-                
-                # --- ΕΠΙΛΟΓΗ ΦΥΤΟΥ (CUSTOM) ---
                 crop_sel = v2.selectbox("Είδος Καλλιέργειας", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Άλλο (Custom)"])
-                
                 if crop_sel == "Άλλο (Custom)":
                     custom_crop = v2.text_input("Όνομα Καλλιέργειας", value="Πατάτα")
                     rem_coef = v2.number_input("Ανάγκες σε Άζωτο (Μονάδες/100kg)", 1.0, 10.0, 3.0)
                 else:
                     if crop_sel == "Βαμβάκι": rem_coef = 4.5
                     elif crop_sel == "Καλαμπόκι": rem_coef = 3.0
-                    else: rem_coef = 3.0 # Wheat default
+                    else: rem_coef = 3.0
                 
-                # --- ΠΟΙΚΙΛΙΑ (ALWAYS VISIBLE) ---
                 vrt_variety = v2.text_input("Ποικιλία", key="vrt_var")
-                
                 yld = v2.number_input("Στόχος (kg/στρ)", 400)
                 
-                # --- ΛΙΠΑΣΜΑ (CUSTOM) ---
                 fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
                 fert = v1.selectbox("Λίπασμα", fert_options)
                 
@@ -455,9 +492,7 @@ else:
                     elif "20" in fert: n_per = 0.20
                 
                 dose = ((yld/100)*rem_coef) / n_per / 0.8
-                
-                final_crop_display = custom_crop if crop_sel == "Άλλο (Custom)" else crop_sel
-                st.success(f"👉 Δόση για **{final_crop_display} ({vrt_variety})**: **{dose:.1f} kg/στρ**")
+                st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
 
             st.divider()
             st.subheader("🛠️ EffiSpray")
@@ -531,7 +566,6 @@ else:
                 if new_pass: st.session_state.users_db[curr_uname]['password'] = new_pass
                 save_data("users"); st.success("OK")
 
-    # --- USER MANAGEMENT (THE FIX) ---
     elif selected == "Διαχείριση Χρηστών":
         if current_role not in ['owner', 'admin']:
             st.error("No Access")
