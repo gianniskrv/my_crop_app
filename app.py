@@ -113,7 +113,7 @@ st.markdown("""
     .stButton>button:hover { transform: scale(1.02); }
     .metric-card { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     
-    /* Expander Styling - Make title bigger and green */
+    /* Expander Styling */
     div[data-testid="stExpander"] details summary p {
         font-weight: bold;
         font-size: 1.05rem;
@@ -256,7 +256,7 @@ if not st.session_state.authenticated:
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN) - NEW ORGANIZED MENU
+    # 📱 MAIN APP (LOGGED IN) - MENU
     # ==================================================
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
@@ -284,7 +284,7 @@ else:
         with st.expander("🌦️ Γεωργία & Καιρός", expanded=True):
             opt_agro = option_menu(
                 menu_title=None,
-                options=["Καιρός & GDD"], # Εμφανής επιλογή
+                options=["Καιρός"], # ΔΙΟΡΘΩΣΗ ΟΝΟΜΑΤΟΣ
                 icons=["cloud-sun"],
                 default_index=0,
                 key="nav_agro",
@@ -292,7 +292,6 @@ else:
 
         # --- ΚΑΤΗΓΟΡΙΑ 3: ΓΕΝΙΚΑ ---
         with st.expander("⚙️ Γενικά & Προφίλ", expanded=True):
-            # Χτίσιμο λίστας επιλογών
             gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
             gen_icons = ["chat-text", "life-preserver", "person-circle"]
             
@@ -327,7 +326,6 @@ else:
         st.session_state.active_page = opt_gen
         st.session_state.prev_nav_gen = opt_gen
 
-    # Handle first load
     if st.session_state.active_page == "Dashboard" and opt_mng != "Dashboard":
          pass
          
@@ -464,7 +462,7 @@ else:
                 cc2.markdown(style)
 
     # --- 6. WEATHER ---
-    elif selected == "Καιρός & GDD":
+    elif selected == "Καιρός":
         st.title("🌦️ Καιρός & GDD")
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
         lat, lon = 39.6390, 22.4191
@@ -491,10 +489,13 @@ else:
         tbase = c_base.number_input("Tbase", 0.0)
 
         if st.button("🔄 Λήψη Δεδομένων", type="primary"):
-            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15"
-            st.session_state.weather_data = requests.get(url).json()
-            st.session_state.weather_loc_name = display_name
-            st.rerun()
+            try:
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15"
+                st.session_state.weather_data = requests.get(url).json()
+                st.session_state.weather_loc_name = display_name
+                st.rerun()
+            except:
+                st.error("Σφάλμα κατά τη λήψη δεδομένων.")
 
         if st.session_state.weather_data:
             d = st.session_state.weather_data
