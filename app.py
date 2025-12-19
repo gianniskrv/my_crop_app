@@ -203,7 +203,7 @@ if not st.session_state.authenticated:
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN)
+    # 📱 MAIN APP (LOGGED IN) - MENU
     # ==================================================
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
@@ -216,17 +216,14 @@ else:
         else: st.caption("MEMBER")
         st.divider()
 
-        # 1. ΔΙΑΧΕΙΡΙΣΗ
         with st.expander("🚜 Διαχείριση & Οργάνωση", expanded=True):
             opt_mng = option_menu(None, ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο"], 
                 icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check"], default_index=0, key="nav_mng")
 
-        # 2. ΓΕΩΡΓΙΑ & ΚΑΙΡΟΣ (ΔΙΑΧΩΡΙΣΜΟΣ)
         with st.expander("🌦️ Γεωργία & Καιρός", expanded=True):
             opt_agro = option_menu(None, ["Καιρός", "GDD & Ανάπτυξη"], 
                 icons=["cloud-sun", "graph-up-arrow"], default_index=0, key="nav_agro")
 
-        # 3. ΓΕΝΙΚΑ
         with st.expander("⚙️ Γενικά & Προφίλ", expanded=True):
             gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
             gen_icons = ["chat-text", "life-preserver", "person-circle"]
@@ -277,7 +274,7 @@ else:
 
     elif selected == "Οικονομικά":
         st.title("📝 Οικονομικά")
-        t1, t2 = st.tabs(["Έσοδα", "Έξοδα"])
+        t1, t2, t3 = st.tabs(["Έσοδα", "Έξοδα", "Export"])
         with t1:
             with st.form("inc_form"):
                 c1, c2 = st.columns(2)
@@ -286,9 +283,7 @@ else:
                 price = st.number_input("Τιμή (€/kg)", 0.0)
                 if st.form_submit_button("💾 Αποθήκευση"):
                     st.session_state.history_log.append({"date": date.today(), "type": "income", "name": name, "quantity": qty, "price": price, "revenue": qty*price})
-                    save_data("history")
-                    st.success("ΟΚ!")
-                    st.rerun()
+                    save_data("history"); st.success("ΟΚ!"); st.rerun()
         with t2:
             with st.form("exp_form"):
                 cat = st.selectbox("Κατηγορία", ["Λιπάσματα", "Φάρμακα", "Πετρέλαιο"])
@@ -296,9 +291,11 @@ else:
                 desc = st.text_input("Περιγραφή")
                 if st.form_submit_button("💾 Αποθήκευση"):
                     st.session_state.expenses_log.append({"date": date.today(), "type": "expense", "category": cat, "description": desc, "amount_total": amount})
-                    save_data("expenses")
-                    st.success("ΟΚ!")
-                    st.rerun()
+                    save_data("expenses"); st.success("ΟΚ!"); st.rerun()
+        with t3:
+            c1,c2 = st.columns(2)
+            if st.session_state.history_log: c1.download_button("CSV In", pd.DataFrame(st.session_state.history_log).to_csv(index=False), "in.csv")
+            if st.session_state.expenses_log: c2.download_button("CSV Out", pd.DataFrame(st.session_state.expenses_log).to_csv(index=False), "out.csv")
 
     elif selected == "Αποθήκη":
         st.title("📦 Αποθήκη")
@@ -307,9 +304,7 @@ else:
             qty = st.number_input("Ποσότητα", step=1.0)
             if st.form_submit_button("Ενημέρωση"):
                 st.session_state.inventory_db.append({"item": item, "quantity": qty})
-                save_data("inventory")
-                st.success("ΟΚ!")
-                st.rerun()
+                save_data("inventory"); st.success("ΟΚ!"); st.rerun()
         if st.session_state.inventory_db: st.dataframe(pd.DataFrame(st.session_state.inventory_db), use_container_width=True)
 
     elif selected == "Μηχανήματα":
@@ -319,8 +314,7 @@ else:
             m_hours = st.number_input("Ώρες", 0)
             if st.form_submit_button("Προσθήκη"):
                 st.session_state.machinery_db.append({"name": m_name, "hours": m_hours})
-                save_data("machinery")
-                st.rerun()
+                save_data("machinery"); st.rerun()
         if st.session_state.machinery_db: st.dataframe(pd.DataFrame(st.session_state.machinery_db), use_container_width=True)
 
     elif selected == "Ημερολόγιο":
@@ -330,18 +324,16 @@ else:
             td = st.date_input("Ημερομηνία")
             if st.form_submit_button("Προσθήκη"):
                 st.session_state.calendar_db.append({"title": tt, "date": td, "done": False})
-                save_data("calendar")
-                st.rerun()
+                save_data("calendar"); st.rerun()
         for i, t in enumerate(st.session_state.calendar_db):
             c1, c2 = st.columns([0.1, 0.9])
             done = c1.checkbox("", t.get('done', False), key=f"t_{i}")
             if done != t.get('done', False): t['done'] = done; save_data("calendar"); st.rerun()
             c2.write(f"~~{t['title']}~~" if done else f"**{t['title']}**")
 
-    # --- ΚΑΙΡΟΣ (ΑΠΛΟΠΟΙΗΜΕΝΟ) ---
+    # --- ΚΑΙΡΟΣ ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & Πρόγνωση")
-        
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
         lat, lon = 39.6390, 22.4191
         display_name = "Λάρισα"
@@ -376,26 +368,25 @@ else:
             c1.metric("Θερμοκρασία", f"{curr.get('temperature_2m', '-')} °C")
             c2.metric("Βροχή", f"{curr.get('precipitation', '-')} mm")
             
-            # Simple Chart
             daily = d.get('daily', {})
             if daily:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS (ΧΩΡΙΣ DEMO) ---
+    # --- GDD & TOOLS (VRT & EFFISPRAY RESTORED) ---
     elif selected == "GDD & Ανάπτυξη":
-        st.title("📈 Ανάπτυξη Φυτών & Εργαλεία")
+        st.title("📈 Ανάπτυξη & Εργαλεία")
         
-        # Πρέπει να υπάρχει καιρός
         if not st.session_state.weather_data:
             st.warning("⚠️ Πηγαίνετε στην καρτέλα 'Καιρός' και πατήστε 'Λήψη Καιρού' πρώτα!")
         else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
+            # GDD Calculator
+            st.subheader("🧬 GDD")
             c_crop, c_var, c_base = st.columns(3)
-            # Αφαίρεση του (Demo)
-            crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι") 
+            crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι")
             crop_var = c_var.text_input("Ποικιλία", "Skelio")
             tbase = c_base.number_input("Tbase", 0.0)
             
@@ -406,40 +397,82 @@ else:
                 acc += max(avg - tbase, 0)
                 gdd_cum.append(acc)
             
-            st.subheader(f"GDD: {crop_name} ({crop_var})")
             st.area_chart(pd.DataFrame({"Date": dates, "GDD": gdd_cum}).set_index("Date"), color="#2e7d32")
-            
+            st.info(f"Σύνολο GDD: {acc:.1f}")
+
             st.divider()
-            st.subheader("🛠️ Εργαλεία")
-            st.link_button("🚜 EffiSpray", "https://www.effispray.com/el")
+            
+            # --- VRT CALCULATOR RESTORED ---
+            st.subheader("🧪 VRT Λίπανση")
+            with st.container(border=True):
+                v1, v2 = st.columns(2)
+                crop_vrt = v1.selectbox("Φυτό", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
+                rem_coef = 4.5 if crop_vrt == "Βαμβάκι" else 3.0
+                yld = st.number_input("Στόχος (kg/στρ)", 400)
+                fert = st.selectbox("Λίπασμα", ["Ουρία (46)", "Νιτρική (34.5)", "NPK (20)"])
+                n_per = 0.46
+                if "34.5" in fert: n_per=0.345
+                elif "20" in fert: n_per=0.20
+                
+                dose = ((yld/100)*rem_coef) / n_per / 0.8
+                st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
+
+            st.divider()
+            st.subheader("🛠️ EffiSpray")
+            st.link_button("🌐 EffiSpray.com", "https://www.effispray.com/el")
             with st.expander("📺 Προβολή"):
                 components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
+    # --- ΜΗΝΥΜΑΤΑ (FULL RESTORED) ---
     elif selected == "Μηνύματα":
         st.title("💬 Μηνύματα")
+        
+        if is_owner:
+            tab_inbox, tab_sent, tab_global = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα", "🌐 Global"])
+        else:
+            tab_inbox, tab_sent = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα"])
+        
         with st.expander("✉️ Νέο Μήνυμα"):
             with st.form("msg_form"):
-                to = st.text_input("Προς (Username)")
+                recipients = list(st.session_state.users_db.keys()) if (is_owner or is_admin) else ["Support"]
+                if st.session_state.current_username in recipients: recipients.remove(st.session_state.current_username)
+                to_user = st.selectbox("Προς:", recipients)
+                subj = st.text_input("Θέμα")
                 body = st.text_area("Μήνυμα")
                 if st.form_submit_button("Αποστολή"):
-                    st.session_state.messages_db.append({"from": st.session_state.current_username, "to": to, "body": body, "time": str(datetime.now())})
-                    save_data("messages")
-                    st.success("Εστάλη!")
-        
-        # Inbox
-        msgs = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (is_owner and m.get('to') == "Support")]
-        for m in reversed(msgs):
-            st.info(f"Από: {m.get('from')} | {m.get('time')}\n\n{m.get('body')}")
+                    st.session_state.messages_db.append({"from": st.session_state.current_username, "to": to_user, "subject": subj, "body": body, "timestamp": str(datetime.now())})
+                    save_data("messages"); st.success("Εστάλη!"); st.rerun()
 
+        my_inbox = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (m.get('to') == "Support" and (is_owner or is_admin))]
+        my_sent = [m for m in st.session_state.messages_db if m.get('from') == st.session_state.current_username]
+
+        with tab_inbox:
+            for m in reversed(my_inbox):
+                with st.container(border=True):
+                    st.write(f"**Από:** {m.get('from')} | **Θέμα:** {m.get('subject')}")
+                    with st.expander("Διαβάστε"):
+                        st.write(m.get('body'))
+                        if m.get('image'): st.image(base64.b64decode(m.get('image')))
+
+        with tab_sent:
+            for m in reversed(my_sent):
+                st.info(f"Προς: {m.get('to')} | {m.get('body')}")
+
+        if is_owner:
+            with tab_global: st.dataframe(pd.DataFrame(st.session_state.messages_db))
+
+    # --- HELP (FULL RESTORED) ---
     elif selected == "Βοήθεια":
         st.title("🆘 Help Desk")
         with st.form("help"):
             sub = st.text_input("Θέμα")
             desc = st.text_area("Περιγραφή")
+            img = st.file_uploader("Φωτογραφία", type=['png','jpg'])
             if st.form_submit_button("Αποστολή"):
-                st.session_state.messages_db.append({"from": st.session_state.current_username, "to": "Support", "body": f"Subject: {sub}\n{desc}", "time": str(datetime.now())})
+                img_str = image_to_base64(img)
+                st.session_state.messages_db.append({"from": st.session_state.current_username, "to": "Support", "subject": f"[TICKET] {sub}", "body": desc, "image": img_str, "timestamp": str(datetime.now())})
                 save_data("messages")
-                send_email(EMAIL_SENDER, "Support Ticket", f"{sub}\n{desc}")
+                send_email(EMAIL_SENDER, "Ticket", f"{sub}\n{desc}")
                 st.success("OK")
 
     elif selected == "Το Προφίλ μου":
@@ -448,8 +481,7 @@ else:
             new_pass = st.text_input("Νέος Κωδικός", type="password")
             if st.form_submit_button("Αλλαγή"):
                 st.session_state.users_db[st.session_state.current_username]['password'] = new_pass
-                save_data("users")
-                st.success("OK")
+                save_data("users"); st.success("OK")
 
     elif selected == "Διαχείριση Χρηστών":
         if is_owner or is_admin:
