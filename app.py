@@ -61,11 +61,14 @@ def load_data():
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else: st.session_state.users_db = {}
 
+    # --- SECURITY: LOCK GIANNISKRV AS OWNER ---
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
-    if "GiannisKrv" in st.session_state.users_db:
-        st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-        if not os.path.exists(FILES["users"]): save_data("users")
+    
+    # Force Role Owner every time app loads
+    st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+    
+    if not os.path.exists(FILES["users"]): save_data("users")
 
     for key, file_path in FILES.items():
         if key == "users": continue
@@ -116,6 +119,7 @@ if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
 if 'current_username' not in st.session_state: st.session_state.current_username = None
 if 'active_page' not in st.session_state: st.session_state.active_page = "Dashboard"
+
 if 'reset_mode' not in st.session_state: st.session_state.reset_mode = False
 if 'reset_step' not in st.session_state: st.session_state.reset_step = 1 
 if 'reset_otp' not in st.session_state: st.session_state.reset_otp = None
@@ -133,10 +137,10 @@ def login_user(username, password):
         else: st.error("Λάθος κωδικός.")
     else: st.error("Ο χρήστης δεν βρέθηκε.")
 
-def register_user(new_user, new_pass, new_name, new_email):
+def register_user(new_user, new_pass, new_name, new_email, new_phone):
     if new_user in st.session_state.users_db: st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
-        st.session_state.users_db[new_user] = {"password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": ""}
+        st.session_state.users_db[new_user] = {"password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": new_phone}
         save_data("users")
         send_email(new_email, "🌱 Καλωσήρθες στο AgroManager Pro", f"Γεια σου {new_name},\n\nΟ λογαριασμός σου δημιουργήθηκε!\nUsername: {new_user}\nPassword: {new_pass}")
         send_email(EMAIL_SENDER, "🔔 Νέα Εγγραφή Χρήστη", f"Νέος χρήστης:\nΌνομα: {new_name}\nUsername: {new_user}\nEmail: {new_email}")
@@ -158,31 +162,59 @@ if not st.session_state.authenticated:
         if st.session_state.reset_mode:
             with st.container(border=True):
                 st.markdown("### 🔄 Ανάκτηση Κωδικού")
+                st.caption("Παρακαλώ εισάγετε ΟΛΑ τα στοιχεία σας για ταυτοποίηση.")
+                
                 if st.session_state.reset_step == 1:
-                    email_input = st.text_input("Email")
-                    if st.button("Αποστολή Κωδικού", use_container_width=True):
-                        found_user = None
-                        for uname, udata in st.session_state.users_db.items():
-                            if udata.get('email') == email_input: found_user = uname; break
-                        if found_user:
-                            otp = str(random.randint(100000, 999999))
-                            st.session_state.reset_otp = otp
-                            st.session_state.reset_email_target = email_input
-                            st.session_state.reset_username_target = found_user
-                            if send_email(email_input, "🔑 Κωδικός Επαναφοράς", f"Κωδικός: {otp}"):
-                                st.session_state.reset_step = 2; st.toast("Εστάλη!", icon="📧"); time.sleep(1); st.rerun()
-                            else: st.error("Σφάλμα Email.")
-                        else: st.error("Άγνωστο Email.")
-                    if st.button("Πίσω"): st.session_state.reset_mode = False; st.rerun()
+                    # ΑΥΣΤΗΡΗ ΤΑΥΤΟΠΟΙΗΣΗ
+                    r_user = st.text_input("Username")
+                    r_name = st.text_input("Ονοματεπώνυμο")
+                    r_email = st.text_input("Email")
+                    r_phone = st.text_input("Τηλέφωνο")
+                    
+                    col_r1, col_r2 = st.columns(2)
+                    if col_r1.button("Έλεγχος & Αποστολή", use_container_width=True):
+                        found = False
+                        # Check exact match
+                        if r_user in st.session_state.users_db:
+                            u_data = st.session_state.users_db[r_user]
+                            # Ελέγχουμε αν ταιριάζουν όλα
+                            if (u_data['name'] == r_name and 
+                                u_data['email'] == r_email and 
+                                u_data.get('phone') == r_phone):
+                                
+                                found = True
+                                otp = str(random.randint(100000, 999999))
+                                st.session_state.reset_otp = otp
+                                st.session_state.reset_email_target = r_email
+                                st.session_state.reset_username_target = r_user
+                                
+                                if send_email(r_email, "🔑 Κωδικός Επαναφοράς", f"Κωδικός: {otp}"):
+                                    st.session_state.reset_step = 2
+                                    st.toast("Εστάλη!", icon="📧")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else: st.error("Σφάλμα αποστολής Email.")
+                        
+                        if not found:
+                            st.error("Τα στοιχεία δεν ταιριάζουν. Παρακαλώ ελέγξτε τα ξανά.")
+
+                    if col_r2.button("Πίσω", use_container_width=True): 
+                        st.session_state.reset_mode = False; st.rerun()
+
                 elif st.session_state.reset_step == 2:
+                    st.success("Ταυτοποίηση επιτυχής! Ελέγξτε το email σας.")
                     code_input = st.text_input("6ψήφιος κωδικός:")
                     new_password = st.text_input("Νέος Κωδικός:", type="password")
-                    if st.button("💾 Αλλαγή", use_container_width=True):
+                    if st.button("💾 Αποθήκευση", use_container_width=True):
                         if code_input == st.session_state.reset_otp:
                             st.session_state.users_db[st.session_state.reset_username_target]['password'] = new_password
                             save_data("users")
-                            st.success("Επιτυχία!"); st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
-                        else: st.error("Λάθος κωδικός.")
+                            st.success("Επιτυχία!")
+                            st.session_state.reset_mode = False
+                            st.session_state.reset_step = 1
+                            time.sleep(2)
+                            st.rerun()
+                        else: st.error("Λάθος κωδικός OTP.")
         else:
             with st.container(border=True):
                 tab_login, tab_register = st.tabs(["🔑 Σύνδεση", "📝 Νέα Εγγραφή"])
@@ -196,14 +228,15 @@ if not st.session_state.authenticated:
                     new_pass = st.text_input("Password", type="password", key="reg_pass")
                     new_name = st.text_input("Όνομα", key="reg_name")
                     new_email = st.text_input("Email", key="reg_email")
+                    new_phone = st.text_input("Τηλέφωνο", key="reg_phone")
                     if st.button("Δημιουργία", use_container_width=True):
-                        if new_user and new_pass and new_name and new_email:
-                            with st.spinner("Δημιουργία..."): register_user(new_user, new_pass, new_name, new_email)
+                        if new_user and new_pass and new_name and new_email and new_phone:
+                            with st.spinner("Δημιουργία..."): register_user(new_user, new_pass, new_name, new_email, new_phone)
                         else: st.error("Συμπληρώστε όλα τα πεδία.")
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN) - MENU
+    # 📱 MAIN APP (LOGGED IN) - CATEGORIZED MENU
     # ==================================================
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
@@ -331,7 +364,7 @@ else:
             if done != t.get('done', False): t['done'] = done; save_data("calendar"); st.rerun()
             c2.write(f"~~{t['title']}~~" if done else f"**{t['title']}**")
 
-    # --- ΚΑΙΡΟΣ ---
+    # --- ΚΑΙΡΟΣ (FULL DETAILS) ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & Πρόγνωση")
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
@@ -354,7 +387,8 @@ else:
 
         if st.button("🔄 Λήψη Καιρού", type="primary"):
             try:
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
+                # Add wind and humidity params
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
                 st.session_state.weather_data = requests.get(url).json()
                 st.session_state.weather_loc_name = display_name
                 st.rerun()
@@ -364,16 +398,20 @@ else:
             d = st.session_state.weather_data
             curr = d.get('current', {})
             st.success(f"📍 {st.session_state.weather_loc_name}")
-            c1, c2 = st.columns(2)
+            
+            # FULL DETAILS
+            c1, c2, c3, c4 = st.columns(4)
             c1.metric("Θερμοκρασία", f"{curr.get('temperature_2m', '-')} °C")
-            c2.metric("Βροχή", f"{curr.get('precipitation', '-')} mm")
+            c2.metric("Υγρασία", f"{curr.get('relative_humidity_2m', '-')} %")
+            c3.metric("Βροχή", f"{curr.get('precipitation', '-')} mm")
+            c4.metric("Άνεμος", f"{curr.get('wind_speed_10m', '-')} km/h")
             
             daily = d.get('daily', {})
             if daily:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS (VRT & EFFISPRAY RESTORED) ---
+    # --- GDD & TOOLS ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
@@ -383,8 +421,6 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            # GDD Calculator
-            st.subheader("🧬 GDD")
             c_crop, c_var, c_base = st.columns(3)
             crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι")
             crop_var = c_var.text_input("Ποικιλία", "Skelio")
@@ -401,8 +437,6 @@ else:
             st.info(f"Σύνολο GDD: {acc:.1f}")
 
             st.divider()
-            
-            # --- VRT CALCULATOR RESTORED ---
             st.subheader("🧪 VRT Λίπανση")
             with st.container(border=True):
                 v1, v2 = st.columns(2)
@@ -413,7 +447,6 @@ else:
                 n_per = 0.46
                 if "34.5" in fert: n_per=0.345
                 elif "20" in fert: n_per=0.20
-                
                 dose = ((yld/100)*rem_coef) / n_per / 0.8
                 st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
 
@@ -423,10 +456,8 @@ else:
             with st.expander("📺 Προβολή"):
                 components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
-    # --- ΜΗΝΥΜΑΤΑ (FULL RESTORED) ---
     elif selected == "Μηνύματα":
         st.title("💬 Μηνύματα")
-        
         if is_owner:
             tab_inbox, tab_sent, tab_global = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα", "🌐 Global"])
         else:
@@ -461,7 +492,6 @@ else:
         if is_owner:
             with tab_global: st.dataframe(pd.DataFrame(st.session_state.messages_db))
 
-    # --- HELP (FULL RESTORED) ---
     elif selected == "Βοήθεια":
         st.title("🆘 Help Desk")
         with st.form("help"):
@@ -477,17 +507,76 @@ else:
 
     elif selected == "Το Προφίλ μου":
         st.title("👤 Προφίλ")
+        curr_u = st.session_state.current_user
+        curr_uname = st.session_state.current_username
         with st.form("prof"):
+            new_name = st.text_input("Όνομα", value=curr_u['name'])
+            new_email = st.text_input("Email", value=curr_u['email'])
+            new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
+            st.markdown("---")
             new_pass = st.text_input("Νέος Κωδικός", type="password")
-            if st.form_submit_button("Αλλαγή"):
-                st.session_state.users_db[st.session_state.current_username]['password'] = new_pass
+            if st.form_submit_button("Αποθήκευση"):
+                st.session_state.users_db[curr_uname]['name'] = new_name
+                st.session_state.users_db[curr_uname]['email'] = new_email
+                st.session_state.users_db[curr_uname]['phone'] = new_phone
+                if new_pass: st.session_state.users_db[curr_uname]['password'] = new_pass
                 save_data("users"); st.success("OK")
 
+    # --- USER MANAGEMENT (THE FIX) ---
     elif selected == "Διαχείριση Χρηστών":
-        if is_owner or is_admin:
+        if current_role not in ['owner', 'admin']:
+            st.error("No Access")
+        else:
             st.title("👥 Users")
-            st.dataframe(pd.DataFrame(st.session_state.users_db).T)
-        else: st.error("No Access")
+            
+            # Headers
+            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 2])
+            c1.markdown("**Username**")
+            c2.markdown("**Όνομα**")
+            c3.markdown("**Email**")
+            c4.markdown("**Credentials**") # Password & Phone hidden
+            c5.markdown("**Role**")
+            c6.markdown("**Show/Hide**")
+            st.divider()
+            
+            for uname, udata in st.session_state.users_db.items():
+                c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 2])
+                c1.write(uname)
+                c2.write(udata['name'])
+                c3.write(udata['email'])
+                
+                # --- HIDING LOGIC ---
+                key_vis = f"vis_{uname}"
+                if key_vis not in st.session_state: st.session_state[key_vis] = False
+                
+                if st.session_state[key_vis]:
+                    # Reveal Mode
+                    c4.warning(f"🔑: {udata['password']}")
+                    c4.caption(f"📞: {udata.get('phone', '-')}")
+                    icon = "🙈 Hide"
+                else:
+                    # Hidden Mode
+                    c4.write("******")
+                    icon = "👁️ Show"
+                
+                if c6.button(icon, key=f"btn_{uname}"):
+                    st.session_state[key_vis] = not st.session_state[key_vis]
+                    st.rerun()
+
+                # --- ROLE LOGIC ---
+                u_role = udata.get('role', 'user')
+                if is_owner:
+                    if uname == "GiannisKrv": c5.success("OWNER")
+                    else:
+                        # Owner can change roles
+                        new_r = c5.selectbox("", ["user", "admin"], index=0 if u_role=="user" else 1, key=f"r_{uname}", label_visibility="collapsed")
+                        if new_r != u_role:
+                            st.session_state.users_db[uname]['role'] = new_r
+                            save_data("users"); st.rerun()
+                else:
+                    # Admin just views
+                    c5.write(u_role.upper())
+                st.markdown("---")
 
     elif selected == "Logout":
         logout()
