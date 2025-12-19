@@ -23,15 +23,15 @@ st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide"
 # 🧬 ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (FAO & UNIVERSITY STANDARDS)
 # ==============================================================================
 CROP_STANDARDS = {
-    "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200, "desc": "Υψηλές απαιτήσεις θερμότητας"},
-    "Καλαμπόκι (FAO 600-700)": {"tbase": 10.0, "target_gdd": 1700, "desc": "Μέσο-όψιμες ποικιλίες"},
-    "Καλαμπόκι (FAO 300-400)": {"tbase": 10.0, "target_gdd": 1400, "desc": "Πρώιμες ποικιλίες"},
-    "Σιτάρι (Σκληρό)": {"tbase": 0.0, "target_gdd": 2100, "desc": "Χειμερινό σιτηρό"},
-    "Σιτάρι (Μαλακό)": {"tbase": 0.0, "target_gdd": 2000, "desc": "Χειμερινό σιτηρό"},
-    "Βιομηχανική Τομάτα": {"tbase": 10.0, "target_gdd": 1450, "desc": "Καλοκαιρινή"},
-    "Μηδική (Ανά κοπή)": {"tbase": 5.0, "target_gdd": 450, "desc": "Θερμότητα ανά κύκλο κοπής"},
-    "Ηλίανθος": {"tbase": 6.0, "target_gdd": 1600, "desc": "Ανθεκτικό στο κρύο"},
-    "Custom (Ορίστε εσείς)": {"tbase": 10.0, "target_gdd": 2000, "desc": "Χειροκίνητη ρύθμιση"}
+    "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200},
+    "Καλαμπόκι (FAO 600-700)": {"tbase": 10.0, "target_gdd": 1700},
+    "Καλαμπόκι (FAO 300-400)": {"tbase": 10.0, "target_gdd": 1400},
+    "Σιτάρι (Σκληρό)": {"tbase": 0.0, "target_gdd": 2100},
+    "Σιτάρι (Μαλακό)": {"tbase": 0.0, "target_gdd": 2000},
+    "Βιομηχανική Τομάτα": {"tbase": 10.0, "target_gdd": 1450},
+    "Μηδική": {"tbase": 5.0, "target_gdd": 450},
+    "Ηλίανθος": {"tbase": 6.0, "target_gdd": 1600},
+    "Custom (Ορίστε εσείς)": {"tbase": 10.0, "target_gdd": 2000}
 }
 
 # ==============================================================================
@@ -79,7 +79,6 @@ def load_data():
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
     
-    # Force Owner Role
     st.session_state.users_db["GiannisKrv"]["role"] = "owner"
     
     if not os.path.exists(FILES["users"]): save_data("users")
@@ -234,7 +233,7 @@ if not st.session_state.authenticated:
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN) - CATEGORIZED MENU
+    # 📱 MAIN APP (LOGGED IN) - MENU
     # ==================================================
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
@@ -265,7 +264,6 @@ else:
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
 
-    # SYNC MENU LOGIC
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
@@ -405,7 +403,7 @@ else:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS (NEW DB INTEGRATED) ---
+    # --- GDD & TOOLS ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
@@ -415,32 +413,27 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            # 1. GDD Calculator with Database
+            # --- UPDATED GDD INPUTS ---
             st.subheader("🧬 Υπολογισμός GDD")
-            st.caption("Επιλέξτε καλλιέργεια για να δείτε την πρόοδο ανάπτυξης.")
+            c_crop, c_input = st.columns(2)
             
-            c_crop, c_var = st.columns(2)
+            # 1. Select Standard (Drop-down)
+            selected_standard_key = c_crop.selectbox("Επιλέξτε Πρότυπο (για υπολογισμό)", list(CROP_STANDARDS.keys()))
+            crop_data = CROP_STANDARDS[selected_standard_key]
             
-            # Dropdown from DB
-            selected_crop_key = c_crop.selectbox("Επιλέξτε Καλλιέργεια", list(CROP_STANDARDS.keys()))
-            crop_data = CROP_STANDARDS[selected_crop_key]
+            # 2. Name Your Crop (Text Box - Pre-filled but Editable)
+            final_crop_name = c_input.text_input("Όνομα Καλλιέργειας (Πληκτρολογήστε)", value=selected_standard_key)
             
-            # Variety Input (User defined)
-            variety_name = c_var.text_input("Ποικιλία / Υβρίδιο", value="Standard")
+            c_var, c_params = st.columns(2)
+            variety_name = c_var.text_input("Ποικιλία", value="Standard")
             
-            # Show Params
-            c1, c2 = st.columns(2)
-            
-            # If Custom, allow editing Tbase
-            if "Custom" in selected_crop_key:
-                tbase = c1.number_input("Θερμοκρασία Βάσης (Tbase)", value=crop_data['tbase'])
-                target_gdd = c2.number_input("Στόχος GDD (Ωρίμανση)", value=crop_data['target_gdd'])
+            if "Custom" in selected_standard_key:
+                tbase = c_params.number_input("Tbase", value=10.0)
+                target_gdd = c_params.number_input("Target GDD", value=2000)
             else:
-                # Read-only info for standard crops
                 tbase = crop_data['tbase']
                 target_gdd = crop_data['target_gdd']
-                c1.info(f"Tbase: **{tbase}°C**")
-                c2.info(f"Στόχος GDD: **{target_gdd}**")
+                c_params.info(f"Tbase: {tbase}°C | Target: {target_gdd}")
 
             # Calc
             dates = daily['time']
@@ -451,18 +444,15 @@ else:
                 gdd_cum.append(acc)
             
             # Chart
-            df_gdd = pd.DataFrame({"Date": dates, "GDD": gdd_cum})
-            
-            # Add Target Line
-            fig = px.area(df_gdd, x='Date', y='GDD', title=f"Πρόοδος: {selected_crop_key} ({variety_name})", color_discrete_sequence=['#2e7d32'])
-            fig.add_hline(y=target_gdd, line_dash="dot", annotation_text="Στόχος Ωρίμανσης", annotation_position="bottom right", line_color="red")
+            fig = px.area(pd.DataFrame({"Date": dates, "GDD": gdd_cum}), x='Date', y='GDD', 
+                          title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
+            fig.add_hline(y=target_gdd, line_dash="dot", line_color="red", annotation_text="Target")
             st.plotly_chart(fig, use_container_width=True)
-            
-            st.info(f"Συνολικοί Βαθμοί (Τελευταίες 15 μέρες): **{acc:.1f}**")
+            st.info(f"Συνολικοί Βαθμοί: **{acc:.1f}**")
 
             st.divider()
             
-            # --- VRT CALCULATOR ---
+            # --- VRT CALCULATOR (CUSTOM) ---
             st.subheader("🧪 VRT Λίπανση")
             with st.container(border=True):
                 v1, v2 = st.columns(2)
