@@ -113,10 +113,10 @@ st.markdown("""
     .stButton>button:hover { transform: scale(1.02); }
     .metric-card { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     
-    /* Expander Styling to look like Categories */
+    /* Expander Styling - Make title bigger and green */
     div[data-testid="stExpander"] details summary p {
         font-weight: bold;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         color: #2e7d32;
     }
 </style>
@@ -270,7 +270,7 @@ else:
         
         st.divider()
 
-        # --- ΚΑΤΗΓΟΡΙΑ 1: ΔΙΑΧΕΙΡΙΣΗ & ΟΡΓΑΝΩΣΗ ---
+        # --- ΚΑΤΗΓΟΡΙΑ 1: ΔΙΑΧΕΙΡΙΣΗ ---
         with st.expander("🚜 Διαχείριση & Οργάνωση", expanded=True):
             opt_mng = option_menu(
                 menu_title=None,
@@ -278,23 +278,21 @@ else:
                 icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check"],
                 default_index=0,
                 key="nav_mng",
-                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
             )
 
         # --- ΚΑΤΗΓΟΡΙΑ 2: ΑΓΡΟΝΟΜΙΑ ---
-        with st.expander("🌦️ Γεωργία & Καιρός", expanded=False):
+        with st.expander("🌦️ Γεωργία & Καιρός", expanded=True):
             opt_agro = option_menu(
                 menu_title=None,
-                options=["Καιρός"], # Έχουμε βάλει το EffiSpray μεσα στον Καιρό, αν θες το χωρίζουμε
+                options=["Καιρός & GDD"], # Εμφανής επιλογή
                 icons=["cloud-sun"],
                 default_index=0,
                 key="nav_agro",
-                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
             )
 
-        # --- ΚΑΤΗΓΟΡΙΑ 3: ΓΕΝΙΚΑ & ΥΠΟΣΤΗΡΙΞΗ ---
-        with st.expander("⚙️ Γενικά & Προφίλ", expanded=False):
-            # Δυναμική λίστα επιλογών ανάλογα με τον ρόλο
+        # --- ΚΑΤΗΓΟΡΙΑ 3: ΓΕΝΙΚΑ ---
+        with st.expander("⚙️ Γενικά & Προφίλ", expanded=True):
+            # Χτίσιμο λίστας επιλογών
             gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
             gen_icons = ["chat-text", "life-preserver", "person-circle"]
             
@@ -311,34 +309,26 @@ else:
                 icons=gen_icons,
                 default_index=0,
                 key="nav_gen",
-                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
             )
 
     # --- LOGIC TO SYNC MENUS ---
-    # Ελέγχουμε ποιο μενού άλλαξε τελευταίο και ενημερώνουμε την active_page
-    # Χρησιμοποιούμε session state για να θυμόμαστε την προηγούμενη κατάσταση
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
 
-    # Αν άλλαξε το 1ο μενού
+    # Detect changes
     if opt_mng != st.session_state.prev_nav_mng:
         st.session_state.active_page = opt_mng
         st.session_state.prev_nav_mng = opt_mng
-    
-    # Αν άλλαξε το 2ο μενού
     elif opt_agro != st.session_state.prev_nav_agro:
         st.session_state.active_page = opt_agro
         st.session_state.prev_nav_agro = opt_agro
-        
-    # Αν άλλαξε το 3ο μενού
     elif opt_gen != st.session_state.prev_nav_gen:
         st.session_state.active_page = opt_gen
         st.session_state.prev_nav_gen = opt_gen
 
-    # Για την πρώτη φορά που τρέχει
+    # Handle first load
     if st.session_state.active_page == "Dashboard" and opt_mng != "Dashboard":
-         # Κρατάμε το default
          pass
          
     selected = st.session_state.active_page
@@ -474,7 +464,7 @@ else:
                 cc2.markdown(style)
 
     # --- 6. WEATHER ---
-    elif selected == "Καιρός":
+    elif selected == "Καιρός & GDD":
         st.title("🌦️ Καιρός & GDD")
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
         lat, lon = 39.6390, 22.4191
@@ -525,7 +515,7 @@ else:
             st.area_chart(pd.DataFrame({"Date": dates, "GDD": gdd_cum}).set_index("Date"), color="#2e7d32")
 
         st.divider()
-        st.subheader("🛠️ Εξωτερικά Εργαλεία")
+        st.subheader("🛠️ Εργαλεία")
         with st.container(border=True):
             col_tool_img, col_tool_desc = st.columns([1, 4])
             with col_tool_desc:
