@@ -165,7 +165,6 @@ if not st.session_state.authenticated:
                 st.caption("Παρακαλώ εισάγετε ΟΛΑ τα στοιχεία σας για ταυτοποίηση.")
                 
                 if st.session_state.reset_step == 1:
-                    # ΑΥΣΤΗΡΗ ΤΑΥΤΟΠΟΙΗΣΗ
                     r_user = st.text_input("Username")
                     r_name = st.text_input("Ονοματεπώνυμο")
                     r_email = st.text_input("Email")
@@ -174,35 +173,23 @@ if not st.session_state.authenticated:
                     col_r1, col_r2 = st.columns(2)
                     if col_r1.button("Έλεγχος & Αποστολή", use_container_width=True):
                         found = False
-                        # Check exact match
                         if r_user in st.session_state.users_db:
                             u_data = st.session_state.users_db[r_user]
-                            # Ελέγχουμε αν ταιριάζουν όλα
-                            if (u_data['name'] == r_name and 
-                                u_data['email'] == r_email and 
-                                u_data.get('phone') == r_phone):
-                                
+                            if (u_data['name'] == r_name and u_data['email'] == r_email and u_data.get('phone') == r_phone):
                                 found = True
                                 otp = str(random.randint(100000, 999999))
                                 st.session_state.reset_otp = otp
                                 st.session_state.reset_email_target = r_email
                                 st.session_state.reset_username_target = r_user
-                                
                                 if send_email(r_email, "🔑 Κωδικός Επαναφοράς", f"Κωδικός: {otp}"):
-                                    st.session_state.reset_step = 2
-                                    st.toast("Εστάλη!", icon="📧")
-                                    time.sleep(1)
-                                    st.rerun()
-                                else: st.error("Σφάλμα αποστολής Email.")
-                        
-                        if not found:
-                            st.error("Τα στοιχεία δεν ταιριάζουν. Παρακαλώ ελέγξτε τα ξανά.")
-
+                                    st.session_state.reset_step = 2; st.toast("Εστάλη!", icon="📧"); time.sleep(1); st.rerun()
+                                else: st.error("Σφάλμα Email.")
+                        if not found: st.error("Τα στοιχεία δεν ταιριάζουν.")
                     if col_r2.button("Πίσω", use_container_width=True): 
                         st.session_state.reset_mode = False; st.rerun()
 
                 elif st.session_state.reset_step == 2:
-                    st.success("Ταυτοποίηση επιτυχής! Ελέγξτε το email σας.")
+                    st.success("Ελέγξτε το email σας.")
                     code_input = st.text_input("6ψήφιος κωδικός:")
                     new_password = st.text_input("Νέος Κωδικός:", type="password")
                     if st.button("💾 Αποθήκευση", use_container_width=True):
@@ -210,10 +197,7 @@ if not st.session_state.authenticated:
                             st.session_state.users_db[st.session_state.reset_username_target]['password'] = new_password
                             save_data("users")
                             st.success("Επιτυχία!")
-                            st.session_state.reset_mode = False
-                            st.session_state.reset_step = 1
-                            time.sleep(2)
-                            st.rerun()
+                            st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
                         else: st.error("Λάθος κωδικός OTP.")
         else:
             with st.container(border=True):
@@ -387,7 +371,6 @@ else:
 
         if st.button("🔄 Λήψη Καιρού", type="primary"):
             try:
-                # Add wind and humidity params
                 url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
                 st.session_state.weather_data = requests.get(url).json()
                 st.session_state.weather_loc_name = display_name
@@ -398,8 +381,6 @@ else:
             d = st.session_state.weather_data
             curr = d.get('current', {})
             st.success(f"📍 {st.session_state.weather_loc_name}")
-            
-            # FULL DETAILS
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Θερμοκρασία", f"{curr.get('temperature_2m', '-')} °C")
             c2.metric("Υγρασία", f"{curr.get('relative_humidity_2m', '-')} %")
@@ -437,16 +418,29 @@ else:
             st.info(f"Σύνολο GDD: {acc:.1f}")
 
             st.divider()
+            
+            # --- VRT CALCULATOR WITH CUSTOM OPTION ---
             st.subheader("🧪 VRT Λίπανση")
             with st.container(border=True):
                 v1, v2 = st.columns(2)
-                crop_vrt = v1.selectbox("Φυτό", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
+                crop_vrt = v2.selectbox("Φυτό", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
                 rem_coef = 4.5 if crop_vrt == "Βαμβάκι" else 3.0
-                yld = st.number_input("Στόχος (kg/στρ)", 400)
-                fert = st.selectbox("Λίπασμα", ["Ουρία (46)", "Νιτρική (34.5)", "NPK (20)"])
-                n_per = 0.46
-                if "34.5" in fert: n_per=0.345
-                elif "20" in fert: n_per=0.20
+                yld = v2.number_input("Στόχος (kg/στρ)", 400)
+                
+                # Επιλογή με Custom
+                fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
+                fert = v1.selectbox("Λίπασμα", fert_options)
+                
+                n_per = 0.0
+                if fert == "Άλλο (Custom)":
+                    custom_n = v1.number_input("Περιεκτικότητα Αζώτου (%)", min_value=1.0, max_value=100.0, value=26.0)
+                    n_per = custom_n / 100.0
+                else:
+                    if "46" in fert: n_per = 0.46
+                    elif "34.5" in fert: n_per = 0.345
+                    elif "21" in fert: n_per = 0.21
+                    elif "20" in fert: n_per = 0.20
+                
                 dose = ((yld/100)*rem_coef) / n_per / 0.8
                 st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
 
@@ -528,13 +522,11 @@ else:
             st.error("No Access")
         else:
             st.title("👥 Users")
-            
-            # Headers
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 2])
             c1.markdown("**Username**")
             c2.markdown("**Όνομα**")
             c3.markdown("**Email**")
-            c4.markdown("**Credentials**") # Password & Phone hidden
+            c4.markdown("**Credentials**")
             c5.markdown("**Role**")
             c6.markdown("**Show/Hide**")
             st.divider()
@@ -550,12 +542,10 @@ else:
                 if key_vis not in st.session_state: st.session_state[key_vis] = False
                 
                 if st.session_state[key_vis]:
-                    # Reveal Mode
                     c4.warning(f"🔑: {udata['password']}")
                     c4.caption(f"📞: {udata.get('phone', '-')}")
                     icon = "🙈 Hide"
                 else:
-                    # Hidden Mode
                     c4.write("******")
                     icon = "👁️ Show"
                 
@@ -568,13 +558,11 @@ else:
                 if is_owner:
                     if uname == "GiannisKrv": c5.success("OWNER")
                     else:
-                        # Owner can change roles
                         new_r = c5.selectbox("", ["user", "admin"], index=0 if u_role=="user" else 1, key=f"r_{uname}", label_visibility="collapsed")
                         if new_r != u_role:
                             st.session_state.users_db[uname]['role'] = new_r
                             save_data("users"); st.rerun()
                 else:
-                    # Admin just views
                     c5.write(u_role.upper())
                 st.markdown("---")
 
