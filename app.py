@@ -348,7 +348,7 @@ else:
             if done != t.get('done', False): t['done'] = done; save_data("calendar"); st.rerun()
             c2.write(f"~~{t['title']}~~" if done else f"**{t['title']}**")
 
-    # --- ΚΑΙΡΟΣ (FULL DETAILS) ---
+    # --- ΚΑΙΡΟΣ ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & Πρόγνωση")
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
@@ -392,7 +392,7 @@ else:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS ---
+    # --- GDD & TOOLS (VRT CUSTOM CROP & VARIETY ADDED) ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
@@ -419,15 +419,28 @@ else:
 
             st.divider()
             
-            # --- VRT CALCULATOR WITH CUSTOM OPTION ---
+            # --- VRT CALCULATOR UPDATE ---
             st.subheader("🧪 VRT Λίπανση")
             with st.container(border=True):
                 v1, v2 = st.columns(2)
-                crop_vrt = v2.selectbox("Φυτό", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι"])
-                rem_coef = 4.5 if crop_vrt == "Βαμβάκι" else 3.0
+                
+                # --- ΕΠΙΛΟΓΗ ΦΥΤΟΥ (CUSTOM) ---
+                crop_sel = v2.selectbox("Είδος Καλλιέργειας", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Άλλο (Custom)"])
+                
+                if crop_sel == "Άλλο (Custom)":
+                    custom_crop = v2.text_input("Όνομα Καλλιέργειας", value="Πατάτα")
+                    rem_coef = v2.number_input("Ανάγκες σε Άζωτο (Μονάδες/100kg)", 1.0, 10.0, 3.0)
+                else:
+                    if crop_sel == "Βαμβάκι": rem_coef = 4.5
+                    elif crop_sel == "Καλαμπόκι": rem_coef = 3.0
+                    else: rem_coef = 3.0 # Wheat default
+                
+                # --- ΠΟΙΚΙΛΙΑ (ALWAYS VISIBLE) ---
+                vrt_variety = v2.text_input("Ποικιλία", key="vrt_var")
+                
                 yld = v2.number_input("Στόχος (kg/στρ)", 400)
                 
-                # Επιλογή με Custom
+                # --- ΛΙΠΑΣΜΑ (CUSTOM) ---
                 fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
                 fert = v1.selectbox("Λίπασμα", fert_options)
                 
@@ -442,7 +455,9 @@ else:
                     elif "20" in fert: n_per = 0.20
                 
                 dose = ((yld/100)*rem_coef) / n_per / 0.8
-                st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
+                
+                final_crop_display = custom_crop if crop_sel == "Άλλο (Custom)" else crop_sel
+                st.success(f"👉 Δόση για **{final_crop_display} ({vrt_variety})**: **{dose:.1f} kg/στρ**")
 
             st.divider()
             st.subheader("🛠️ EffiSpray")
@@ -537,7 +552,6 @@ else:
                 c2.write(udata['name'])
                 c3.write(udata['email'])
                 
-                # --- HIDING LOGIC ---
                 key_vis = f"vis_{uname}"
                 if key_vis not in st.session_state: st.session_state[key_vis] = False
                 
@@ -553,7 +567,6 @@ else:
                     st.session_state[key_vis] = not st.session_state[key_vis]
                     st.rerun()
 
-                # --- ROLE LOGIC ---
                 u_role = udata.get('role', 'user')
                 if is_owner:
                     if uname == "GiannisKrv": c5.success("OWNER")
