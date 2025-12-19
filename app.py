@@ -273,8 +273,8 @@ if not st.session_state.authenticated:
             else:
                 tab_login, tab_register = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
                 with tab_login:
-                    username = st.text_input("Username", key="login_user", placeholder="π.χ. GiannisKrv")
-                    password = st.text_input("Password", type="password", key="login_pass", placeholder="******")
+                    username = st.text_input("Username", key="login_user")
+                    password = st.text_input("Password", type="password", key="login_pass")
                     
                     if st.button("🚀 Είσοδος", use_container_width=True, type="primary"): 
                         login_user(username, password)
