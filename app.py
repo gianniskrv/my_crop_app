@@ -20,17 +20,17 @@ from email.message import EmailMessage
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 🧬 ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (FAO Standards)
+# 🧬 ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ
 # ==============================================================================
 CROP_STANDARDS = {
-    "Σιτάρι (Χειμερινό)": {"tbase": 0.0, "target_gdd": 2100},  # Default για να φαίνεται διάγραμμα τον χειμώνα
+    "Σιτάρι (Χειμερινό)": {"tbase": 0.0, "target_gdd": 2100},
     "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200},
     "Καλαμπόκι (FAO 700)": {"tbase": 10.0, "target_gdd": 1700},
     "Καλαμπόκι (FAO 400)": {"tbase": 10.0, "target_gdd": 1400},
     "Βιομηχανική Τομάτα": {"tbase": 10.0, "target_gdd": 1450},
     "Μηδική": {"tbase": 5.0, "target_gdd": 450},
     "Ηλίανθος": {"tbase": 6.0, "target_gdd": 1600},
-    "Custom (Ορίστε εσείς)": {"tbase": 10.0, "target_gdd": 2000}
+    "Custom": {"tbase": 10.0, "target_gdd": 2000}
 }
 
 # ==============================================================================
@@ -75,9 +75,9 @@ def load_data():
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else: st.session_state.users_db = {}
 
+    # Lock Owner
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
-    
     st.session_state.users_db["GiannisKrv"]["role"] = "owner"
     
     if not os.path.exists(FILES["users"]): save_data("users")
@@ -175,13 +175,11 @@ if not st.session_state.authenticated:
             with st.container(border=True):
                 st.markdown("### 🔄 Ανάκτηση Κωδικού")
                 st.caption("Παρακαλώ εισάγετε ΟΛΑ τα στοιχεία σας για ταυτοποίηση.")
-                
                 if st.session_state.reset_step == 1:
                     r_user = st.text_input("Username")
                     r_name = st.text_input("Ονοματεπώνυμο")
                     r_email = st.text_input("Email")
                     r_phone = st.text_input("Τηλέφωνο")
-                    
                     col_r1, col_r2 = st.columns(2)
                     if col_r1.button("Έλεγχος & Αποστολή", use_container_width=True):
                         found = False
@@ -197,19 +195,14 @@ if not st.session_state.authenticated:
                                     st.session_state.reset_step = 2; st.toast("Εστάλη!", icon="📧"); time.sleep(1); st.rerun()
                                 else: st.error("Σφάλμα Email.")
                         if not found: st.error("Τα στοιχεία δεν ταιριάζουν.")
-                    if col_r2.button("Πίσω", use_container_width=True): 
-                        st.session_state.reset_mode = False; st.rerun()
-
+                    if col_r2.button("Πίσω", use_container_width=True): st.session_state.reset_mode = False; st.rerun()
                 elif st.session_state.reset_step == 2:
-                    st.success("Ελέγξτε το email σας.")
                     code_input = st.text_input("6ψήφιος κωδικός:")
                     new_password = st.text_input("Νέος Κωδικός:", type="password")
                     if st.button("💾 Αποθήκευση", use_container_width=True):
                         if code_input == st.session_state.reset_otp:
                             st.session_state.users_db[st.session_state.reset_username_target]['password'] = new_password
-                            save_data("users")
-                            st.success("Επιτυχία!")
-                            st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
+                            save_data("users"); st.success("Επιτυχία!"); st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
                         else: st.error("Λάθος κωδικός OTP.")
         else:
             with st.container(border=True):
@@ -232,7 +225,7 @@ if not st.session_state.authenticated:
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN)
+    # 📱 MAIN APP
     # ==================================================
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
@@ -263,6 +256,7 @@ else:
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
 
+    # SYNC MENUS
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
@@ -280,7 +274,7 @@ else:
     selected = st.session_state.active_page
 
     # ==================================================
-    # 📄 CONTENT RENDERER
+    # 📄 CONTENT
     # ==================================================
 
     if selected == "Dashboard":
@@ -362,12 +356,14 @@ else:
     # --- ΚΑΙΡΟΣ ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & Πρόγνωση")
+        
+        # Λογική για τοποθεσία
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
         lat, lon = 39.6390, 22.4191
         display_name = "Λάρισα"
         
         if mode == "🔍 Πόλη":
-            sc = st.text_input("Πόλη (π.χ. Λάρισα)")
+            sc = st.text_input("Πόλη (π.χ. Λάρισα)", value="Larissa")
             if sc:
                 try:
                     r = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={sc}&count=1&language=el&format=json").json()
@@ -382,11 +378,16 @@ else:
 
         if st.button("🔄 Λήψη Καιρού", type="primary"):
             try:
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
-                st.session_state.weather_data = requests.get(url).json()
-                st.session_state.weather_loc_name = display_name
-                st.rerun()
-            except: st.error("Σφάλμα σύνδεσης.")
+                # Διορθωμένο API call
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&past_days=1"
+                resp = requests.get(url)
+                if resp.status_code == 200:
+                    st.session_state.weather_data = resp.json()
+                    st.session_state.weather_loc_name = display_name
+                    st.rerun()
+                else:
+                    st.error(f"Σφάλμα API: {resp.status_code}")
+            except Exception as e: st.error(f"Σφάλμα: {e}")
 
         if st.session_state.weather_data:
             d = st.session_state.weather_data
@@ -402,55 +403,75 @@ else:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS (TBASE HIDDEN & AUTOMATED) ---
+    # --- GDD & TOOLS ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
+        # 1. Έλεγχος αν υπάρχουν δεδομένα καιρού
         if not st.session_state.weather_data:
-            st.warning("⚠️ Πηγαίνετε στην καρτέλα 'Καιρός' και πατήστε 'Λήψη Καιρού' πρώτα!")
-        else:
+            st.warning("⚠️ Δεν υπάρχουν δεδομένα καιρού. Πατήστε το κουμπί για λήψη.")
+            if st.button("🔄 Λήψη Δεδομένων Καιρού Τώρα"):
+                try:
+                    # Default Larissa
+                    url = "https://api.open-meteo.com/v1/forecast?latitude=39.6390&longitude=22.4191&daily=temperature_2m_max,temperature_2m_min&past_days=30&timezone=auto"
+                    st.session_state.weather_data = requests.get(url).json()
+                    st.session_state.weather_loc_name = "Λάρισα (Auto)"
+                    st.rerun()
+                except: st.error("Σφάλμα.")
+        
+        if st.session_state.weather_data:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            # --- GDD ---
             st.subheader("🧬 Υπολογισμός GDD")
-            c_crop, c_input = st.columns(2)
             
-            selected_standard_key = c_crop.selectbox("Επιλέξτε Καλλιέργεια", list(CROP_STANDARDS.keys()))
+            c_type, c_name = st.columns(2)
+            
+            # Dropdown with Standard Crops
+            selected_standard_key = c_type.selectbox("Επιλέξτε Είδος (Πρότυπο)", list(CROP_STANDARDS.keys()))
             crop_data = CROP_STANDARDS[selected_standard_key]
             
-            # Προεπιλογή ονόματος για να μην είναι άδειο
-            final_crop_name = c_input.text_input("Ονομασία (π.χ. Χωράφι Α)", value=selected_standard_key)
+            # User Custom Name
+            user_crop_name = c_name.text_input("Ονομασία Αγροτεμαχίου / Καλλιέργειας", value=selected_standard_key)
             
             c_var, c_params = st.columns(2)
             variety_name = c_var.text_input("Ποικιλία", value="Standard")
             
-            # --- TBASE LOGIC: HIDDEN UNLESS CUSTOM ---
+            # Logic for Tbase display
             if "Custom" in selected_standard_key:
-                tbase = c_params.number_input("Tbase", value=10.0)
-                target_gdd = c_params.number_input("Target GDD", value=2000)
+                tbase = c_params.number_input("Tbase (°C)", value=10.0)
+                target_gdd = c_params.number_input("Στόχος GDD", value=2000)
             else:
                 tbase = crop_data['tbase']
                 target_gdd = crop_data['target_gdd']
-                # Εμφανίζουμε το Tbase μόνο ως πληροφορία, όχι για επεξεργασία
+                # Εμφάνιση πληροφορίας αλλά όχι επεξεργασία (Automatic)
                 c_params.info(f"⚙️ Tbase: **{tbase}°C** (Αυτόματο)")
 
-            dates = daily['time']
-            gdd_cum, acc = [], 0
-            for i in range(len(dates)):
-                avg = (daily['temperature_2m_max'][i] + daily['temperature_2m_min'][i]) / 2
-                acc += max(avg - tbase, 0)
-                gdd_cum.append(acc)
-            
-            fig = px.area(pd.DataFrame({"Date": dates, "GDD": gdd_cum}), x='Date', y='GDD', 
-                          title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
-            fig.add_hline(y=target_gdd, line_dash="dot", line_color="red", annotation_text="Στόχος")
-            st.plotly_chart(fig, use_container_width=True)
-            
-            if acc == 0:
-                st.warning("ℹ️ Η ανάπτυξη είναι 0 λόγω χαμηλών θερμοκρασιών (Χειμώνας).")
+            # Calculation
+            if 'time' in daily:
+                dates = daily['time']
+                gdd_cum, acc = [], 0
+                for i in range(len(dates)):
+                    tmax = daily['temperature_2m_max'][i]
+                    tmin = daily['temperature_2m_min'][i]
+                    if tmax is not None and tmin is not None:
+                        avg = (tmax + tmin) / 2
+                        day_gdd = max(avg - tbase, 0)
+                        acc += day_gdd
+                        gdd_cum.append(acc)
+                
+                # Chart
+                fig = px.area(pd.DataFrame({"Date": dates, "GDD": gdd_cum}), x='Date', y='GDD', 
+                              title=f"Πρόοδος: {user_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
+                fig.add_hline(y=target_gdd, line_dash="dot", line_color="red", annotation_text="Στόχος")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                if acc == 0:
+                    st.warning(f"❄️ Η ανάπτυξη είναι 0.0 επειδή η θερμοκρασία είναι κάτω από {tbase}°C (Χειμώνας).")
+                else:
+                    st.info(f"Συνολικοί Βαθμοί: **{acc:.1f}**")
             else:
-                st.info(f"Συνολικοί Βαθμοί: **{acc:.1f}**")
+                st.error("Πρόβλημα με τα δεδομένα καιρού. Δοκιμάστε ξανά.")
 
             st.divider()
             
