@@ -75,9 +75,11 @@ def load_data():
 
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
-    if "GiannisKrv" in st.session_state.users_db:
-        st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-        if not os.path.exists(FILES["users"]): save_data("users")
+    
+    # Force Owner Role (Κλείδωμα)
+    st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+    
+    if not os.path.exists(FILES["users"]): save_data("users")
 
     for key, file_path in FILES.items():
         if key == "users": continue
@@ -106,75 +108,20 @@ def image_to_base64(uploaded_file):
     except: return None
 
 # ==============================================================================
-# 🎨 BEAUTIFUL UI & CSS (ΑΝΑΒΑΘΜΙΣΜΕΝΟ)
+# 🎨 BEAUTIFUL UI & CSS
 # ==============================================================================
 st.markdown("""
 <style>
-    /* Γενικό Background */
     .stApp { background-color: #fdfdfd; }
-    
-    /* Sidebar Styling */
-    div[data-testid="stSidebar"] { 
-        background-color: #f0f2f6; 
-        border-right: 1px solid #d1d5db;
-    }
-    
-    /* Buttons Styling - Rounded & Green Hover */
-    .stButton>button { 
-        border-radius: 12px; 
-        font-weight: 600; 
-        transition: 0.3s;
-        border: 1px solid #e0e0e0;
-    }
-    .stButton>button:hover { 
-        transform: scale(1.02); 
-        border-color: #2e7d32;
-        color: #2e7d32;
-    }
-    
-    /* Primary Button (Green) */
-    button[kind="primary"] {
-        background-color: #2e7d32 !important;
-        border: none !important;
-    }
-
-    /* Metric Cards Look */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
-        color: #1b5e20;
-        font-weight: 700;
-    }
-    div[data-testid="stMetricLabel"] {
-        font-weight: bold;
-        color: #555;
-    }
-
-    /* Expander Styling */
-    div[data-testid="stExpander"] {
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        background-color: white;
-        margin-bottom: 10px;
-    }
-    div[data-testid="stExpander"] details summary p {
-        font-weight: bold;
-        font-size: 1.1rem;
-        color: #2e7d32;
-    }
-
-    /* Headers */
-    h1, h2, h3 {
-        color: #1b5e20;
-    }
-    
-    /* Custom Card Container */
-    .custom-card {
-        padding: 20px;
-        border-radius: 15px;
-        background-color: white;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
+    div[data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #d1d5db; }
+    .stButton>button { border-radius: 12px; font-weight: 600; transition: 0.3s; border: 1px solid #e0e0e0; }
+    .stButton>button:hover { transform: scale(1.02); border-color: #2e7d32; color: #2e7d32; }
+    button[kind="primary"] { background-color: #2e7d32 !important; border: none !important; }
+    div[data-testid="stMetricValue"] { font-size: 1.6rem !important; color: #1b5e20; font-weight: 700; }
+    div[data-testid="stMetricLabel"] { font-weight: bold; color: #555; }
+    div[data-testid="stExpander"] { border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); background-color: white; margin-bottom: 10px; }
+    div[data-testid="stExpander"] details summary p { font-weight: bold; font-size: 1.1rem; color: #2e7d32; }
+    h1, h2, h3 { color: #1b5e20; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -221,13 +168,12 @@ def logout():
     st.rerun()
 
 # ==================================================
-# 🔐 LOGIN SCREEN (IMPROVED UI)
+# 🔐 LOGIN SCREEN (CLEAN & SECURE)
 # ==================================================
 if not st.session_state.authenticated:
-    st.markdown("<br><br>", unsafe_allow_html=True) # Spacer
+    st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
-        # Card Container for Login
         with st.container(border=True):
             st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🌱 AgroManager Pro</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; color: grey;'>Η έξυπνη πλατφόρμα διαχείρισης</p>", unsafe_allow_html=True)
@@ -273,8 +219,8 @@ if not st.session_state.authenticated:
             else:
                 tab_login, tab_register = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
                 with tab_login:
-                    username = st.text_input("Username", key="login_user")
-                    password = st.text_input("Password", type="password", key="login_pass")
+                    username = st.text_input("Username", key="login_user") # Removed placeholders
+                    password = st.text_input("Password", type="password", key="login_pass") # Removed placeholders
                     
                     if st.button("🚀 Είσοδος", use_container_width=True, type="primary"): 
                         login_user(username, password)
@@ -303,16 +249,16 @@ else:
     is_admin = (current_role == 'admin')
 
     with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/606/606676.png", width=80) # Generic Agro Icon
+        st.image("https://cdn-icons-png.flaticon.com/512/606/606676.png", width=80) 
         st.markdown(f"## 👤 {st.session_state.current_user['name']}")
         
-        # Badge Role
         if is_owner: st.warning("🔒 OWNER ACCOUNT")
         elif is_admin: st.info("🛡️ ADMIN ACCOUNT")
         else: st.success("🌾 MEMBER ACCOUNT")
         
         st.divider()
 
+        # ΜΕΝΟΥ
         with st.expander("🚜 Διαχείριση & Οργάνωση", expanded=True):
             opt_mng = option_menu(None, ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο"], 
                 icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check"], default_index=0, key="nav_mng")
@@ -324,9 +270,12 @@ else:
         with st.expander("⚙️ Γενικά & Προφίλ", expanded=True):
             gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
             gen_icons = ["chat-text", "life-preserver", "person-circle"]
+            
+            # ΕΜΦΑΝΙΣΗ ΜΟΝΟ ΣΕ OWNER/ADMIN
             if is_owner or is_admin:
                 gen_options.append("Διαχείριση Χρηστών")
                 gen_icons.append("people-fill")
+            
             gen_options.append("Logout")
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
@@ -359,7 +308,6 @@ else:
         rev = df_inc['revenue'].sum() if not df_inc.empty else 0
         exp = df_exp['amount_total'].sum() if not df_exp.empty else 0
         
-        # UI CARDS
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             with st.container(border=True):
@@ -484,7 +432,6 @@ else:
             curr = d.get('current', {})
             st.success(f"📍 {st.session_state.weather_loc_name}")
             
-            # Cards for Weather
             c1, c2, c3, c4 = st.columns(4)
             with c1: st.metric("Θερμοκρασία", f"{curr.get('temperature_2m', '-')} °C")
             with c2: st.metric("Υγρασία", f"{curr.get('relative_humidity_2m', '-')} %")
