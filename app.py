@@ -284,7 +284,7 @@ else:
         with st.expander("🌦️ Γεωργία & Καιρός", expanded=True):
             opt_agro = option_menu(
                 menu_title=None,
-                options=["Καιρός"], # ΔΙΟΡΘΩΣΗ ΟΝΟΜΑΤΟΣ
+                options=["Καιρός"], 
                 icons=["cloud-sun"],
                 default_index=0,
                 key="nav_agro",
@@ -483,19 +483,25 @@ else:
             lon = c2.number_input("Lon", 22.4191)
 
         st.divider()
+        # --- FIXED DEMO TEXT HERE ---
         c_crop, c_var, c_base = st.columns(3)
-        crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι (Demo)")
+        crop_name = c_crop.text_input("Καλλιέργεια", "Σιτάρι") # Αφαιρέθηκε το (Demo)
         crop_var = c_var.text_input("Ποικιλία", "Skelio")
         tbase = c_base.number_input("Tbase", 0.0)
 
         if st.button("🔄 Λήψη Δεδομένων", type="primary"):
             try:
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15"
-                st.session_state.weather_data = requests.get(url).json()
-                st.session_state.weather_loc_name = display_name
-                st.rerun()
-            except:
-                st.error("Σφάλμα κατά τη λήψη δεδομένων.")
+                # Added timezone=auto to fix API errors
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min&past_days=15&timezone=auto"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    st.session_state.weather_data = response.json()
+                    st.session_state.weather_loc_name = display_name
+                    st.rerun()
+                else:
+                    st.error(f"Σφάλμα API: {response.status_code}")
+            except Exception as e:
+                st.error(f"Λεπτομέρειες σφάλματος: {e}")
 
         if st.session_state.weather_data:
             d = st.session_state.weather_data
