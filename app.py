@@ -40,7 +40,6 @@ def send_email(receiver, subject, body):
             smtp.send_message(msg)
         return True
     except Exception as e:
-        # print(f"Email Error: {e}")
         return False
 
 # ==============================================================================
@@ -53,7 +52,7 @@ FILES = {
     "inventory": "inventory.json",
     "machinery": "machinery.json",
     "calendar": "calendar.json",
-    "messages": "messages.json"  # <--- ΝΕΟ ΑΡΧΕΙΟ ΓΙΑ ΜΗΝΥΜΑΤΑ & HELP TICKETS
+    "messages": "messages.json"
 }
 
 def date_handler(obj):
@@ -61,13 +60,11 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    # Load Users
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
     else:
         st.session_state.users_db = {}
 
-    # Security: Ensure GiannisKrv is Owner
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
             "password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""
@@ -76,14 +73,12 @@ def load_data():
         st.session_state.users_db["GiannisKrv"]["role"] = "owner"
         if not os.path.exists(FILES["users"]): save_data("users")
 
-    # Load other files
     for key, file_path in FILES.items():
         if key == "users": continue
         state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Date fix for lists
                 if isinstance(data, list):
                     for d in data:
                         if 'date' in d and isinstance(d['date'], str):
@@ -101,14 +96,11 @@ def save_data(key):
             json.dump(st.session_state[state_key], f, default=date_handler, indent=4, ensure_ascii=False)
 
 def image_to_base64(uploaded_file):
-    """Μετατρέπει εικόνα σε κείμενο για αποθήκευση στο JSON"""
-    if uploaded_file is None:
-        return None
+    if uploaded_file is None: return None
     try:
         bytes_data = uploaded_file.getvalue()
         return base64.b64encode(bytes_data).decode()
-    except:
-        return None
+    except: return None
 
 # ==============================================================================
 # 🎨 DESIGN & CSS
@@ -120,6 +112,13 @@ st.markdown("""
     .stButton>button { border-radius: 8px; font-weight: bold; transition: 0.3s; }
     .stButton>button:hover { transform: scale(1.02); }
     .metric-card { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    /* Expander Styling to look like Categories */
+    div[data-testid="stExpander"] details summary p {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #2e7d32;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -133,14 +132,13 @@ if 'authenticated' not in st.session_state: st.session_state.authenticated = Fal
 if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
 if 'current_username' not in st.session_state: st.session_state.current_username = None
+if 'active_page' not in st.session_state: st.session_state.active_page = "Dashboard"
 
-# Reset Vars
 if 'reset_mode' not in st.session_state: st.session_state.reset_mode = False
 if 'reset_step' not in st.session_state: st.session_state.reset_step = 1 
 if 'reset_otp' not in st.session_state: st.session_state.reset_otp = None
 if 'reset_email_target' not in st.session_state: st.session_state.reset_email_target = None
 if 'reset_username_target' not in st.session_state: st.session_state.reset_username_target = None
-
 
 def login_user(username, password):
     if username in st.session_state.users_db:
@@ -162,15 +160,12 @@ def register_user(new_user, new_pass, new_name, new_email):
             "password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": ""
         }
         save_data("users")
-        
         user_subject = "🌱 Καλωσήρθες στο AgroManager Pro"
         user_body = f"Γεια σου {new_name},\n\nΟ λογαριασμός σου δημιουργήθηκε!\nUsername: {new_user}\nPassword: {new_pass}"
         send_email(new_email, user_subject, user_body)
-
         admin_subject = "🔔 Νέα Εγγραφή Χρήστη"
         admin_body = f"Νέος χρήστης:\nΌνομα: {new_name}\nUsername: {new_user}\nEmail: {new_email}"
         send_email(EMAIL_SENDER, admin_subject, admin_body)
-
         st.success("Ο λογαριασμός δημιουργήθηκε! Εστάλη email επιβεβαίωσης.")
 
 def logout():
@@ -186,7 +181,6 @@ if not st.session_state.authenticated:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🌱 AgroManager Pro</h1>", unsafe_allow_html=True)
-        
         if st.session_state.reset_mode:
             with st.container(border=True):
                 st.markdown("### 🔄 Ανάκτηση Κωδικού")
@@ -262,24 +256,11 @@ if not st.session_state.authenticated:
 
 else:
     # ==================================================
-    # 📱 MAIN APP (LOGGED IN)
+    # 📱 MAIN APP (LOGGED IN) - NEW ORGANIZED MENU
     # ==================================================
-    
-    # 1. ΔΟΜΗ ΜΕΝΟΥ
-    menu_options = ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο", "Καιρός", "Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
-    menu_icons = ["speedometer2", "wallet2", "box-seam", "truck", "calendar-check", "cloud-sun", "chat-text", "life-preserver", "person-circle"]
-    
     current_role = st.session_state.current_user.get('role', 'user')
     is_owner = (current_role == 'owner')
     is_admin = (current_role == 'admin')
-
-    # Admin Panel μόνο για Owner & Admin
-    if is_owner or is_admin:
-        menu_options.insert(8, "Διαχείριση Χρηστών")
-        menu_icons.insert(8, "people-fill")
-    
-    menu_options.append("Logout")
-    menu_icons.append("box-arrow-right")
 
     with st.sidebar:
         st.markdown(f"### 👤 {st.session_state.current_user['name']}")
@@ -287,13 +268,84 @@ else:
         elif is_admin: st.caption("🛡️ ADMIN ACCESS")
         else: st.caption("MEMBER")
         
-        selected = option_menu(
-            menu_title="Μενού",
-            options=menu_options,
-            icons=menu_icons,
-            menu_icon="cast", default_index=0,
-            styles={"nav-link-selected": {"background-color": "#2e7d32"}}
-        )
+        st.divider()
+
+        # --- ΚΑΤΗΓΟΡΙΑ 1: ΔΙΑΧΕΙΡΙΣΗ & ΟΡΓΑΝΩΣΗ ---
+        with st.expander("🚜 Διαχείριση & Οργάνωση", expanded=True):
+            opt_mng = option_menu(
+                menu_title=None,
+                options=["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο"],
+                icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check"],
+                default_index=0,
+                key="nav_mng",
+                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
+            )
+
+        # --- ΚΑΤΗΓΟΡΙΑ 2: ΑΓΡΟΝΟΜΙΑ ---
+        with st.expander("🌦️ Γεωργία & Καιρός", expanded=False):
+            opt_agro = option_menu(
+                menu_title=None,
+                options=["Καιρός"], # Έχουμε βάλει το EffiSpray μεσα στον Καιρό, αν θες το χωρίζουμε
+                icons=["cloud-sun"],
+                default_index=0,
+                key="nav_agro",
+                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
+            )
+
+        # --- ΚΑΤΗΓΟΡΙΑ 3: ΓΕΝΙΚΑ & ΥΠΟΣΤΗΡΙΞΗ ---
+        with st.expander("⚙️ Γενικά & Προφίλ", expanded=False):
+            # Δυναμική λίστα επιλογών ανάλογα με τον ρόλο
+            gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
+            gen_icons = ["chat-text", "life-preserver", "person-circle"]
+            
+            if is_owner or is_admin:
+                gen_options.append("Διαχείριση Χρηστών")
+                gen_icons.append("people-fill")
+            
+            gen_options.append("Logout")
+            gen_icons.append("box-arrow-right")
+
+            opt_gen = option_menu(
+                menu_title=None,
+                options=gen_options,
+                icons=gen_icons,
+                default_index=0,
+                key="nav_gen",
+                styles={"container": {"padding": "0!important", "background-color": "#f8f9fa"}}
+            )
+
+    # --- LOGIC TO SYNC MENUS ---
+    # Ελέγχουμε ποιο μενού άλλαξε τελευταίο και ενημερώνουμε την active_page
+    # Χρησιμοποιούμε session state για να θυμόμαστε την προηγούμενη κατάσταση
+    if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
+    if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
+    if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
+
+    # Αν άλλαξε το 1ο μενού
+    if opt_mng != st.session_state.prev_nav_mng:
+        st.session_state.active_page = opt_mng
+        st.session_state.prev_nav_mng = opt_mng
+    
+    # Αν άλλαξε το 2ο μενού
+    elif opt_agro != st.session_state.prev_nav_agro:
+        st.session_state.active_page = opt_agro
+        st.session_state.prev_nav_agro = opt_agro
+        
+    # Αν άλλαξε το 3ο μενού
+    elif opt_gen != st.session_state.prev_nav_gen:
+        st.session_state.active_page = opt_gen
+        st.session_state.prev_nav_gen = opt_gen
+
+    # Για την πρώτη φορά που τρέχει
+    if st.session_state.active_page == "Dashboard" and opt_mng != "Dashboard":
+         # Κρατάμε το default
+         pass
+         
+    selected = st.session_state.active_page
+
+    # ==================================================
+    # 📄 CONTENT RENDERER
+    # ==================================================
 
     # --- 1. DASHBOARD ---
     if selected == "Dashboard":
@@ -473,30 +525,29 @@ else:
             st.area_chart(pd.DataFrame({"Date": dates, "GDD": gdd_cum}).set_index("Date"), color="#2e7d32")
 
         st.divider()
-        st.subheader("🛠️ Εργαλεία")
-        st.link_button("🚜 EffiSpray", "https://www.effispray.com/el")
-        with st.expander("📺 Προβολή"):
-            components.iframe("https://www.effispray.com/el", height=600)
+        st.subheader("🛠️ Εξωτερικά Εργαλεία")
+        with st.container(border=True):
+            col_tool_img, col_tool_desc = st.columns([1, 4])
+            with col_tool_desc:
+                st.markdown("### 🚜 EffiSpray")
+                st.write("Το EffiSpray είναι ένα έξυπνο εργαλείο που σας βοηθά να βελτιστοποιήσετε τους ψεκασμούς σας.")
+                st.link_button("🌐 Μετάβαση στο EffiSpray.com", "https://www.effispray.com/el")
+                with st.expander("📺 Προβολή εδώ"):
+                    components.iframe("https://www.effispray.com/el", height=600, scrolling=True)
 
-    # --- 7. ΜΗΝΥΜΑΤΑ (ΝΕΟ) ---
+    # --- 7. ΜΗΝΥΜΑΤΑ ---
     elif selected == "Μηνύματα":
         st.title("💬 Εσωτερικά Μηνύματα")
         
-        # OWNER GLOBAL VIEW
         if is_owner:
-            tab_inbox, tab_sent, tab_global = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα", "🌐 Global Monitor (Owner)"])
+            tab_inbox, tab_sent, tab_global = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα", "🌐 Global Monitor"])
         else:
             tab_inbox, tab_sent = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα"])
         
-        # -- Form to send message --
         with st.expander("✉️ Σύνταξη Νέου Μηνύματος", expanded=False):
             with st.form("send_msg_form"):
-                # Calculate recipients:
-                # User -> sees only "Support (Admins/Owner)"
-                # Admin/Owner -> sees list of all users
                 if is_owner or is_admin:
                     recipients = list(st.session_state.users_db.keys())
-                    # Remove self
                     if st.session_state.current_username in recipients: recipients.remove(st.session_state.current_username)
                     to_user = st.selectbox("Προς:", recipients)
                 else:
@@ -505,27 +556,17 @@ else:
                 
                 subj = st.text_input("Θέμα")
                 body = st.text_area("Μήνυμα")
-                
                 if st.form_submit_button("Αποστολή"):
-                    msg = {
-                        "from": st.session_state.current_username,
-                        "to": to_user,
-                        "subject": subj,
-                        "body": body,
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "type": "message"
-                    }
+                    msg = {"from": st.session_state.current_username, "to": to_user, "subject": subj, "body": body, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "message"}
                     st.session_state.messages_db.append(msg)
                     save_data("messages")
-                    st.success("Το μήνυμα εστάλη!")
+                    st.success("Εστάλη!")
                     st.rerun()
 
-        # INBOX LOGIC
         my_inbox = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (m.get('to') == "Support" and (is_owner or is_admin))]
         my_sent = [m for m in st.session_state.messages_db if m.get('from') == st.session_state.current_username]
         
         with tab_inbox:
-            if not my_inbox: st.info("Κανένα μήνυμα.")
             for m in reversed(my_inbox):
                 with st.container(border=True):
                     cols = st.columns([1, 4, 2])
@@ -534,64 +575,46 @@ else:
                     cols[2].caption(m.get('timestamp'))
                     with st.expander("Ανάγνωση"):
                         st.write(m.get('body'))
-                        # Αν υπάρχει εικόνα (από Help section)
-                        if m.get('image'):
-                            st.image(base64.b64decode(m.get('image')))
+                        if m.get('image'): st.image(base64.b64decode(m.get('image')))
 
         with tab_sent:
-            if not my_sent: st.info("Δεν έχετε στείλει μηνύματα.")
             for m in reversed(my_sent):
                 with st.container(border=True):
-                    st.write(f"Προς: {m.get('to')} | Θέμα: {m.get('subject')} | {m.get('timestamp')}")
+                    st.write(f"Προς: {m.get('to')} | Θέμα: {m.get('subject')}")
                     st.caption(m.get('body'))
 
         if is_owner:
             with tab_global:
-                st.warning("⚠️ Πλήρης πρόσβαση σε όλα τα μηνύματα του συστήματος.")
-                all_msgs = st.session_state.messages_db
-                df_msgs = pd.DataFrame(all_msgs)
-                st.dataframe(df_msgs, use_container_width=True)
+                st.dataframe(pd.DataFrame(st.session_state.messages_db), use_container_width=True)
 
-
-    # --- 8. ΒΟΗΘΕΙΑ (ΝΕΟ) ---
+    # --- 8. ΒΟΗΘΕΙΑ ---
     elif selected == "Βοήθεια":
-        st.title("🆘 Κέντρο Βοήθειας & Υποστήριξης")
-        st.write("Συμπληρώστε την φόρμα για να επικοινωνήσετε με την τεχνική ομάδα.")
-        
+        st.title("🆘 Κέντρο Βοήθειας")
+        st.write("Συμπληρώστε την φόρμα.")
         with st.form("help_form"):
             c1, c2 = st.columns(2)
-            # Pre-fill
             curr_u = st.session_state.current_user
-            h_name = c1.text_input("Ονοματεπώνυμο", value=curr_u.get('name', ''))
+            h_name = c1.text_input("Όνομα", value=curr_u.get('name', ''))
             h_email = c2.text_input("Email", value=curr_u.get('email', ''))
+            h_subject = st.text_input("Θέμα")
+            h_body = st.text_area("Περιγραφή")
+            h_img = st.file_uploader("Φωτογραφία", type=['png', 'jpg'])
             
-            h_subject = st.text_input("Θέμα (π.χ. Πρόβλημα με την Αποθήκη)")
-            h_body = st.text_area("Αναλυτική Περιγραφή", height=150)
-            
-            h_img = st.file_uploader("Επισύναψη Φωτογραφίας (Προαιρετικό)", type=['png', 'jpg', 'jpeg'])
-            
-            if st.form_submit_button("🚀 Αποστολή Αιτήματος"):
+            if st.form_submit_button("Αποστολή"):
                 img_str = image_to_base64(h_img)
-                
-                # 1. Save to Messages DB as Ticket
                 ticket = {
                     "from": st.session_state.current_username,
-                    "to": "Support", # Goes to Admins/Owner
+                    "to": "Support",
                     "subject": f"[TICKET] {h_subject}",
-                    "body": f"Name: {h_name}\nEmail: {h_email}\n\nMessage:\n{h_body}",
+                    "body": f"Name: {h_name}\nEmail: {h_email}\n\n{h_body}",
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "ticket",
                     "image": img_str
                 }
                 st.session_state.messages_db.append(ticket)
                 save_data("messages")
-                
-                # 2. Email Notification to Owner
-                email_body = f"Νέο Αίτημα Βοήθειας από {h_name} ({st.session_state.current_username})\nΘέμα: {h_subject}\n\nΜήνυμα:\n{h_body}"
-                send_email(EMAIL_SENDER, "🆘 Νέο Ticket Υποστήριξης", email_body)
-                
-                st.success("Το αίτημά σας καταχωρήθηκε! Θα επικοινωνήσουμε σύντομα.")
-
+                send_email(EMAIL_SENDER, "🆘 Νέο Ticket", f"Από {h_name}:\n{h_body}")
+                st.success("Εστάλη!")
 
     # --- 9. ΠΡΟΦΙΛ ---
     elif selected == "Το Προφίλ μου":
@@ -605,7 +628,7 @@ else:
             new_email = c2.text_input("Email", value=curr_u['email'])
             new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
             st.markdown("---")
-            new_pass = st.text_input("Νέος Κωδικός (προαιρετικό)", type="password")
+            new_pass = st.text_input("Νέος Κωδικός", type="password")
             
             if st.form_submit_button("💾 Αποθήκευση"):
                 st.session_state.users_db[curr_uname]['name'] = new_name
@@ -618,13 +641,12 @@ else:
                 time.sleep(1)
                 st.rerun()
 
-    # --- 10. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN & OWNER ONLY) ---
+    # --- 10. ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (ADMIN ONLY) ---
     elif selected == "Διαχείριση Χρηστών":
         if current_role not in ['owner', 'admin']:
-            st.error("⛔ Δεν έχετε δικαίωμα πρόσβασης.")
+            st.error("⛔ Δεν έχετε δικαίωμα.")
         else:
-            st.title("👥 Διαχείριση Εγγεγραμμένων Χρηστών")
-            
+            st.title("👥 Διαχείριση Χρηστών")
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 1])
             c1.markdown("**Username**")
             c2.markdown("**Όνομα**")
@@ -642,31 +664,30 @@ else:
                 
                 key_vis = f"pass_vis_{uname}"
                 if key_vis not in st.session_state: st.session_state[key_vis] = False
+                
                 if st.session_state[key_vis]:
                     c4.warning(udata['password'])
                     icon = "🙈"
                 else:
                     c4.text("••••••••")
                     icon = "👁️"
+                
                 if c6.button(icon, key=f"btn_{uname}"):
                     st.session_state[key_vis] = not st.session_state[key_vis]
                     st.rerun()
 
-                # Role Management (ONLY OWNER CAN EDIT)
                 user_role = udata.get('role', 'user')
                 if current_role == 'owner':
-                    if uname == "GiannisKrv":
-                        c5.success("👑 OWNER")
+                    if uname == "GiannisKrv": c5.success("OWNER")
                     else:
-                        new_role = c5.selectbox("", options=["user", "admin"], index=0 if user_role == "user" else 1, key=f"role_sel_{uname}", label_visibility="collapsed")
+                        new_role = c5.selectbox("", ["user", "admin"], index=0 if user_role == "user" else 1, key=f"role_sel_{uname}", label_visibility="collapsed")
                         if new_role != user_role:
                             st.session_state.users_db[uname]['role'] = new_role
                             save_data("users")
                             st.rerun()
                 else:
-                    # Admin just views
-                    if uname == "GiannisKrv": c5.success("👑 OWNER")
-                    elif user_role == 'admin': c5.info("🛡️ ADMIN")
+                    if uname == "GiannisKrv": c5.success("OWNER")
+                    elif user_role == 'admin': c5.info("ADMIN")
                     else: c5.write("USER")
                 st.markdown("---")
 
