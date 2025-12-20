@@ -40,7 +40,7 @@ def send_email(receiver, subject, body):
     except: return False
 
 # ==============================================================================
-# 💾 DATABASE SYSTEM
+# 💾 DATABASE SYSTEM (ΜΟΝΙΜΗ ΑΠΟΘΗΚΕΥΣΗ)
 # ==============================================================================
 FILES = {
     "users": "users.json",
@@ -49,7 +49,7 @@ FILES = {
     "inventory": "inventory.json",
     "machinery": "machinery.json",
     "calendar": "calendar.json",
-    "messages": "messages.json"
+    "messages": "messages.json"  # <-- ΕΔΩ ΑΠΟΘΗΚΕΥΟΝΤΑΙ ΤΑ ΜΗΝΥΜΑΤΑ
 }
 
 # ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ
@@ -69,38 +69,41 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    # 1. Φόρτωση υπαρχόντων χρηστών
+    # 1. Φόρτωση Χρηστών
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f:
             st.session_state.users_db = json.load(f)
     else:
         st.session_state.users_db = {}
 
-    # 2. EMERGENCY FIX: Force GiannisKrv credentials
-    # Αυτό το κομμάτι εξασφαλίζει ότι ο κωδικός σου θα είναι πάντα 21041414
+    # 2. Εξασφάλιση Owner
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
-            "password": "21041414", # Ο ΣΩΣΤΟΣ ΚΩΔΙΚΟΣ
-            "role": "owner",
-            "name": "Γιάννης",
-            "email": "johnkrv1@gmail.com",
+            "password": "change_me", 
+            "role": "owner", 
+            "name": "Γιάννης", 
+            "email": "johnkrv1@gmail.com", 
             "phone": ""
         }
-    else:
-        # Αν υπάρχει ήδη, επιβάλλουμε τον σωστό κωδικό και ρόλο
-        st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
-        st.session_state.users_db["GiannisKrv"]["role"] = "owner"
     
-    # Αποθήκευση της διόρθωσης
-    save_data("users")
+    # Force Owner Role (χωρίς να πειράζουμε κωδικό)
+    st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+    save_data("users") # Σώζουμε για σιγουριά
 
-    # 3. Φόρτωση υπολοίπων αρχείων
+    # 3. Φόρτωση ΟΛΩΝ των αρχείων (ΚΑΙ ΤΩΝ ΜΗΝΥΜΑΤΩΝ)
     for key, file_path in FILES.items():
         if key == "users": continue
-        state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
+        
+        # Καθορισμός ονόματος μεταβλητής (π.χ. messages_db)
+        if key in ["history", "expenses"]:
+            state_key = f"{key}_log"
+        else:
+            state_key = f"{key}_db"
+            
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+                # Διόρθωση ημερομηνιών
                 if isinstance(data, list):
                     for d in data:
                         if 'date' in d and isinstance(d['date'], str):
@@ -112,11 +115,14 @@ def load_data():
 
 def save_data(key):
     target_file = FILES.get(key)
-    state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
+    
     if key == "users":
         data_to_save = st.session_state.users_db
+    elif key in ["history", "expenses"]:
+        data_to_save = st.session_state.get(f"{key}_log", [])
     else:
-        data_to_save = st.session_state.get(state_key, [])
+        # Εδώ πέφτουν τα messages (messages_db)
+        data_to_save = st.session_state.get(f"{key}_db", [])
         
     if target_file:
         with open(target_file, 'w', encoding='utf-8') as f:
@@ -510,22 +516,18 @@ else:
             with st.container(border=True):
                 st.subheader("🧪 VRT Λίπανση")
                 v1, v2 = st.columns(2)
-                
-                # --- ΕΠΙΛΟΓΗ ΦΥΤΟΥ (CUSTOM) ---
                 crop_sel = v2.selectbox("Είδος Καλλιέργειας", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Άλλο (Custom)"])
-                
                 if crop_sel == "Άλλο (Custom)":
                     custom_crop = v2.text_input("Όνομα Καλλιέργειας", value="Πατάτα")
                     rem_coef = v2.number_input("Ανάγκες σε Άζωτο (Μονάδες/100kg)", 1.0, 10.0, 3.0)
                 else:
                     if crop_sel == "Βαμβάκι": rem_coef = 4.5
                     elif crop_sel == "Καλαμπόκι": rem_coef = 3.0
-                    else: rem_coef = 3.0 # Wheat default
+                    else: rem_coef = 3.0
                 
                 vrt_variety = v2.text_input("Ποικιλία", key="vrt_var")
                 yld = v2.number_input("Στόχος (kg/στρ)", 400)
                 
-                # --- ΛΙΠΑΣΜΑ (CUSTOM) ---
                 fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
                 fert = v1.selectbox("Λίπασμα", fert_options)
                 
@@ -563,8 +565,11 @@ else:
                 subj = st.text_input("Θέμα")
                 body = st.text_area("Μήνυμα")
                 if st.form_submit_button("🚀 Αποστολή"):
+                    # SAVE TO DB & DISK
                     st.session_state.messages_db.append({"from": st.session_state.current_username, "to": to_user, "subject": subj, "body": body, "timestamp": str(datetime.now())})
-                    save_data("messages"); st.success("Εστάλη!"); st.rerun()
+                    save_data("messages") # <--- CRITICAL PERSISTENCE
+                    st.success("Εστάλη!")
+                    st.rerun()
 
         my_inbox = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (m.get('to') == "Support" and (is_owner or is_admin))]
         my_sent = [m for m in st.session_state.messages_db if m.get('from') == st.session_state.current_username]
@@ -592,15 +597,15 @@ else:
             img = st.file_uploader("Φωτογραφία", type=['png','jpg'])
             if st.form_submit_button("🚀 Αποστολή"):
                 img_str = image_to_base64(img)
+                # SAVE TO DB & DISK
                 st.session_state.messages_db.append({"from": st.session_state.current_username, "to": "Support", "subject": f"[TICKET] {sub}", "body": desc, "image": img_str, "timestamp": str(datetime.now())})
-                save_data("messages")
+                save_data("messages") # <--- CRITICAL PERSISTENCE
                 send_email(EMAIL_SENDER, "Ticket", f"{sub}\n{desc}")
                 st.success("OK")
 
     elif selected == "Το Προφίλ μου":
         st.title("👤 Προφίλ")
         
-        # ΑΣΦΑΛΗΣ ΑΝΑΓΝΩΣΗ ΧΡΗΣΤΗ
         curr_uname = st.session_state.current_username
         if curr_uname in st.session_state.users_db:
             curr_u = st.session_state.users_db[curr_uname]
@@ -623,13 +628,12 @@ else:
                         st.session_state.users_db[curr_uname]['password'] = new_pass
                     
                     save_data("users")
-                    # Update session object
                     st.session_state.current_user = st.session_state.users_db[curr_uname]
                     st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
                     time.sleep(1)
                     st.rerun()
         else:
-            st.error("Σφάλμα φόρτωσης προφίλ. Παρακαλώ κάντε επανασύνδεση.")
+            st.error("Σφάλμα φόρτωσης προφίλ.")
 
     elif selected == "Διαχείριση Χρηστών":
         if current_role not in ['owner', 'admin']:
