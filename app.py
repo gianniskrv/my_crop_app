@@ -40,7 +40,7 @@ def send_email(receiver, subject, body):
     except: return False
 
 # ==============================================================================
-# 💾 DATABASE SYSTEM (ΜΟΝΙΜΗ ΑΠΟΘΗΚΕΥΣΗ)
+# 💾 DATABASE SYSTEM (PERSISTENT STORAGE)
 # ==============================================================================
 FILES = {
     "users": "users.json",
@@ -69,14 +69,22 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    # 1. Φόρτωση Χρηστών
+    """
+    Φορτώνει τα δεδομένα από τον δίσκο στη μνήμη (RAM) κατά την εκκίνηση.
+    ΔΕΝ διαγράφει τίποτα αν υπάρχουν αρχεία.
+    """
+    # 1. Φόρτωση Χρηστών (Users)
     if os.path.exists(FILES["users"]):
-        with open(FILES["users"], 'r', encoding='utf-8') as f:
-            st.session_state.users_db = json.load(f)
+        try:
+            with open(FILES["users"], 'r', encoding='utf-8') as f:
+                st.session_state.users_db = json.load(f)
+        except:
+            st.session_state.users_db = {} # Αν χαλάσει το αρχείο
     else:
         st.session_state.users_db = {}
 
-    # 2. Εξασφάλιση Owner (με τον σωστό κωδικό)
+    # 2. Εξασφάλιση Owner (Χωρίς να πειράζουμε άλλους)
+    # Αν δεν υπάρχει ο Owner, τον φτιάχνουμε.
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
             "password": "21041414", 
@@ -86,13 +94,15 @@ def load_data():
             "phone": ""
         }
     else:
-        # Αν υπάρχει, επιβεβαιώνουμε τα βασικά credentials
-        st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
+        # Αν υπάρχει, σιγουρεύουμε μόνο τα credentials (για να μην κλειδωθείς έξω)
+        # Αλλά ΔΕΝ διαγράφουμε τους άλλους χρήστες!
         st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-        
+        st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
+    
+    # Σώζουμε για να είμαστε σίγουροι
     save_data("users")
 
-    # 3. Φόρτωση ΟΛΩΝ των αρχείων
+    # 3. Φόρτωση ΟΛΩΝ των άλλων αρχείων
     for key, file_path in FILES.items():
         if key == "users": continue
         
@@ -102,18 +112,26 @@ def load_data():
             state_key = f"{key}_db"
             
         if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    for d in data:
-                        if 'date' in d and isinstance(d['date'], str):
-                            try: d['date'] = datetime.strptime(d['date'][:10], "%Y-%m-%d").date()
-                            except: pass
-                st.session_state[state_key] = data
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Convert dates back to objects
+                    if isinstance(data, list):
+                        for d in data:
+                            if 'date' in d and isinstance(d['date'], str):
+                                try: d['date'] = datetime.strptime(d['date'][:10], "%Y-%m-%d").date()
+                                except: pass
+                    st.session_state[state_key] = data
+            except:
+                st.session_state[state_key] = []
         else:
             st.session_state[state_key] = []
 
 def save_data(key):
+    """
+    Αποθηκεύει τα δεδομένα από τη μνήμη (RAM) στον δίσκο (JSON).
+    Καλείται κάθε φορά που αλλάζει κάτι.
+    """
     target_file = FILES.get(key)
     
     if key == "users":
@@ -133,57 +151,50 @@ def image_to_base64(uploaded_file):
     except: return None
 
 # ==============================================================================
-# 🎨 BEAUTIFUL UI & CSS (ΜΕ ΔΥΝΑΜΙΚΟ ΦΟΝΤΟ)
+# 🎨 UI & CSS (Agro Theme)
 # ==============================================================================
 st.markdown("""
 <style>
-    /* --- ΔΥΝΑΜΙΚΟ ΦΟΝΤΟ ΓΕΩΠΟΝΙΑΣ --- */
+    /* Dynamic Background */
     .stApp {
-        /* Απαλό κινούμενο gradient με γήινα και φυτικά χρώματα */
-        /* Πολύ απαλό πράσινο, κρεμ/κίτρινο, απαλό γαλάζιο */
         background: linear-gradient(-45deg, #f1f8e9, #dcedc8, #fffde7, #e3f2fd);
         background-size: 400% 400%;
         animation: agroAnim 25s ease infinite;
     }
-
-    /* Η κίνηση του background */
     @keyframes agroAnim {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
     }
-
-    /* Sidebar με εφέ ημιδιαφάνειας (Frosted Glass) για να δένει με το φόντο */
     div[data-testid="stSidebar"] {
-        background-color: rgba(240, 242, 246, 0.85) !important; /* Slight transparency */
+        background-color: rgba(240, 242, 246, 0.85) !important;
         border-right: 1px solid rgba(209, 213, 219, 0.5);
-        backdrop-filter: blur(8px); /* Εφέ θολώματος */
+        backdrop-filter: blur(8px);
     }
-    
-    /* --- ΓΕΝΙΚΑ ΣΤΥΛ --- */
     .stButton>button { border-radius: 12px; font-weight: 600; transition: 0.3s; border: 1px solid #e0e0e0; }
     .stButton>button:hover { transform: scale(1.02); border-color: #2e7d32; color: #2e7d32; }
     button[kind="primary"] { background-color: #2e7d32 !important; border: none !important; }
     div[data-testid="stMetricValue"] { font-size: 1.6rem !important; color: #1b5e20; font-weight: 700; }
     div[data-testid="stMetricLabel"] { font-weight: bold; color: #555; }
-    
-    /* Cards & Expanders με λευκό φόντο για αντίθεση */
-    div[data-testid="stExpander"], div[data-testid="stMetric"], .metric-card { 
-        border-radius: 12px; 
+    div[data-testid="stExpander"] { 
+        border-radius: 10px; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.08); 
-        background-color: rgba(255, 255, 255, 0.95) !important; /* Σχεδόν συμπαγές λευκό */
+        background-color: rgba(255, 255, 255, 0.95) !important; 
         margin-bottom: 12px;
         border: none !important;
     }
     div[data-testid="stExpander"] details summary p { font-weight: bold; font-size: 1.1rem; color: #2e7d32; }
-    h1, h2, h3 { color: #1b5e20; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); }
+    h1, h2, h3 { color: #1b5e20; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 👤 AUTH & SESSION
+# 👤 AUTH & SESSION INITIALIZATION
 # ==============================================================================
-if 'data_loaded' not in st.session_state: load_data(); st.session_state.data_loaded = True
+if 'data_loaded' not in st.session_state:
+    load_data() # <--- ΦΟΡΤΩΣΗ ΑΠΟ ΔΙΣΚΟ ΠΡΩΤΑ ΑΠΟ ΟΛΑ
+    st.session_state.data_loaded = True
+
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
@@ -208,10 +219,11 @@ def login_user(username, password):
     else: st.error("Ο χρήστης δεν βρέθηκε.")
 
 def register_user(new_user, new_pass, new_name, new_email, new_phone):
-    if new_user in st.session_state.users_db: st.warning("Το όνομα χρήστη υπάρχει ήδη.")
+    if new_user in st.session_state.users_db: 
+        st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
         st.session_state.users_db[new_user] = {"password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": new_phone}
-        save_data("users")
+        save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ ΣΤΟΝ ΔΙΣΚΟ
         send_email(new_email, "🌱 Καλωσήρθες στο AgroManager Pro", f"Γεια σου {new_name},\n\nΟ λογαριασμός σου δημιουργήθηκε!\nUsername: {new_user}\nPassword: {new_pass}")
         send_email(EMAIL_SENDER, "🔔 Νέα Εγγραφή Χρήστη", f"Νέος χρήστης:\nΌνομα: {new_name}\nUsername: {new_user}\nEmail: {new_email}")
         st.success("Ο λογαριασμός δημιουργήθηκε! Εστάλη email επιβεβαίωσης.")
@@ -229,7 +241,6 @@ if not st.session_state.authenticated:
     st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
-        # Χρήση st.container για λευκό φόντο στην κάρτα login, ώστε να ξεχωρίζει από το δυναμικό φόντο
         with st.container(border=True):
             st.markdown("<h1 style='text-align: center; color: #2e7d32;'>🌱 AgroManager Pro</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; color: grey;'>Η έξυπνη πλατφόρμα διαχείρισης</p>", unsafe_allow_html=True)
@@ -268,7 +279,7 @@ if not st.session_state.authenticated:
                     if st.button("💾 Αποθήκευση", use_container_width=True, type="primary"):
                         if code_input == st.session_state.reset_otp:
                             st.session_state.users_db[st.session_state.reset_username_target]['password'] = new_password
-                            save_data("users")
+                            save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
                             st.success("Ο κωδικός άλλαξε!")
                             st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
                         else: st.error("Λάθος OTP.")
@@ -332,7 +343,6 @@ else:
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
 
-    # SYNC MENUS
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
@@ -596,7 +606,9 @@ else:
                 body = st.text_area("Μήνυμα")
                 if st.form_submit_button("🚀 Αποστολή"):
                     st.session_state.messages_db.append({"from": st.session_state.current_username, "to": to_user, "subject": subj, "body": body, "timestamp": str(datetime.now())})
-                    save_data("messages"); st.success("Εστάλη!"); st.rerun()
+                    save_data("messages") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
+                    st.success("Εστάλη!")
+                    st.rerun()
 
         my_inbox = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (m.get('to') == "Support" and (is_owner or is_admin))]
         my_sent = [m for m in st.session_state.messages_db if m.get('from') == st.session_state.current_username]
@@ -625,7 +637,7 @@ else:
             if st.form_submit_button("🚀 Αποστολή"):
                 img_str = image_to_base64(img)
                 st.session_state.messages_db.append({"from": st.session_state.current_username, "to": "Support", "subject": f"[TICKET] {sub}", "body": desc, "image": img_str, "timestamp": str(datetime.now())})
-                save_data("messages")
+                save_data("messages") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
                 send_email(EMAIL_SENDER, "Ticket", f"{sub}\n{desc}")
                 st.success("OK")
 
@@ -640,13 +652,13 @@ else:
                 new_email = c2.text_input("Email", value=curr_u.get('email', ''))
                 new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
                 st.markdown("---")
-                new_pass = st.text_input("Νέος Κωδικός (αφήστε κενό αν δεν θέλετε αλλαγή)", type="password")
+                new_pass = st.text_input("Νέος Κωδικός", type="password")
                 if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
                     st.session_state.users_db[curr_uname]['name'] = new_name
                     st.session_state.users_db[curr_uname]['email'] = new_email
                     st.session_state.users_db[curr_uname]['phone'] = new_phone
                     if new_pass: st.session_state.users_db[curr_uname]['password'] = new_pass
-                    save_data("users")
+                    save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
                     st.session_state.current_user = st.session_state.users_db[curr_uname]
                     st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
                     time.sleep(1)
