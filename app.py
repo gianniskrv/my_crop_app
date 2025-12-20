@@ -69,30 +69,32 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    # 1. Φόρτωση Χρηστών από το αρχείο
+    # 1. Φόρτωση υπαρχόντων χρηστών
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f:
             st.session_state.users_db = json.load(f)
     else:
         st.session_state.users_db = {}
 
-    # 2. Αν δεν υπάρχει καθόλου ο GiannisKrv (π.χ. πρώτη φορά), τον δημιουργούμε.
-    # ΑΛΛΑ αν υπάρχει, ΔΕΝ τον πειράζουμε (για να μην χάνεις αλλαγές).
+    # 2. EMERGENCY FIX: Force GiannisKrv credentials
+    # Αυτό το κομμάτι εξασφαλίζει ότι ο κωδικός σου θα είναι πάντα 21041414
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
-            "password": "change_me", 
-            "role": "owner", 
-            "name": "Γιάννης", 
-            "email": "johnkrv1@gmail.com", 
+            "password": "21041414", # Ο ΣΩΣΤΟΣ ΚΩΔΙΚΟΣ
+            "role": "owner",
+            "name": "Γιάννης",
+            "email": "johnkrv1@gmail.com",
             "phone": ""
         }
-        save_data("users")
-
-    # 3. ΑΣΦΑΛΕΙΑ: Επιβάλουμε ΜΟΝΟ τον ρόλο owner, χωρίς να αλλάζουμε τα υπόλοιπα.
-    if "GiannisKrv" in st.session_state.users_db:
+    else:
+        # Αν υπάρχει ήδη, επιβάλλουμε τον σωστό κωδικό και ρόλο
+        st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
         st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+    
+    # Αποθήκευση της διόρθωσης
+    save_data("users")
 
-    # 4. Φόρτωση υπολοίπων αρχείων
+    # 3. Φόρτωση υπολοίπων αρχείων
     for key, file_path in FILES.items():
         if key == "users": continue
         state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
@@ -111,7 +113,6 @@ def load_data():
 def save_data(key):
     target_file = FILES.get(key)
     state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
-    # Ειδική διαχείριση για users ώστε να σώζει το users_db
     if key == "users":
         data_to_save = st.session_state.users_db
     else:
@@ -127,7 +128,7 @@ def image_to_base64(uploaded_file):
     except: return None
 
 # ==============================================================================
-# 🎨 UI & CSS
+# 🎨 BEAUTIFUL UI & CSS
 # ==============================================================================
 st.markdown("""
 <style>
@@ -295,6 +296,7 @@ else:
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
 
+    # SYNC MENUS
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
@@ -508,18 +510,22 @@ else:
             with st.container(border=True):
                 st.subheader("🧪 VRT Λίπανση")
                 v1, v2 = st.columns(2)
+                
+                # --- ΕΠΙΛΟΓΗ ΦΥΤΟΥ (CUSTOM) ---
                 crop_sel = v2.selectbox("Είδος Καλλιέργειας", ["Βαμβάκι", "Καλαμπόκι", "Σιτάρι", "Άλλο (Custom)"])
+                
                 if crop_sel == "Άλλο (Custom)":
                     custom_crop = v2.text_input("Όνομα Καλλιέργειας", value="Πατάτα")
                     rem_coef = v2.number_input("Ανάγκες σε Άζωτο (Μονάδες/100kg)", 1.0, 10.0, 3.0)
                 else:
                     if crop_sel == "Βαμβάκι": rem_coef = 4.5
                     elif crop_sel == "Καλαμπόκι": rem_coef = 3.0
-                    else: rem_coef = 3.0
+                    else: rem_coef = 3.0 # Wheat default
                 
                 vrt_variety = v2.text_input("Ποικιλία", key="vrt_var")
                 yld = v2.number_input("Στόχος (kg/στρ)", 400)
                 
+                # --- ΛΙΠΑΣΜΑ (CUSTOM) ---
                 fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
                 fert = v1.selectbox("Λίπασμα", fert_options)
                 
