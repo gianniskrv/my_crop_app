@@ -16,11 +16,11 @@ import random
 import base64
 from email.message import EmailMessage
 
-# --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
+# --- 1. PAGE SETTINGS ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
+# 📧 EMAIL SETTINGS
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
 EMAIL_PASSWORD = "bcgb tdmn sjwe ajnt"
@@ -52,7 +52,7 @@ FILES = {
     "messages": "messages.json"
 }
 
-# ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ
+# AGRONOMIC DB
 CROP_STANDARDS = {
     "Σιτάρι (Χειμερινό)": {"tbase": 0.0, "target_gdd": 2100},
     "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200},
@@ -69,18 +69,27 @@ def date_handler(obj):
     return obj
 
 def load_data():
+    # Load existing users
     if os.path.exists(FILES["users"]):
-        with open(FILES["users"], 'r', encoding='utf-8') as f: st.session_state.users_db = json.load(f)
-    else: st.session_state.users_db = {}
+        with open(FILES["users"], 'r', encoding='utf-8') as f:
+            st.session_state.users_db = json.load(f)
+    else:
+        st.session_state.users_db = {}
 
-    if "GiannisKrv" not in st.session_state.users_db:
-        st.session_state.users_db["GiannisKrv"] = {"password": "change_me", "role": "owner", "name": "Γιάννης", "email": "johnkrv1@gmail.com", "phone": ""}
+    # --- SECURITY FIX: FORCE RESET OWNER PASSWORD ---
+    # Ensure GiannisKrv exists and has the correct password/role
+    st.session_state.users_db["GiannisKrv"] = {
+        "password": "change_me",  # Force the correct password
+        "role": "owner",
+        "name": "Γιάννης",
+        "email": "johnkrv1@gmail.com",
+        "phone": ""
+    }
     
-    # Force Owner Role (Κλείδωμα)
-    st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-    
-    if not os.path.exists(FILES["users"]): save_data("users")
+    # Save the corrected data immediately
+    save_data("users")
 
+    # Load other files
     for key, file_path in FILES.items():
         if key == "users": continue
         state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
@@ -93,14 +102,21 @@ def load_data():
                             try: d['date'] = datetime.strptime(d['date'][:10], "%Y-%m-%d").date()
                             except: pass
                 st.session_state[state_key] = data
-        else: st.session_state[state_key] = []
+        else:
+            st.session_state[state_key] = []
 
 def save_data(key):
     target_file = FILES.get(key)
     state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
-    if target_file and state_key in st.session_state:
+    # Special handling for users to grab from users_db instead of _db/_log
+    if key == "users":
+        data_to_save = st.session_state.users_db
+    else:
+        data_to_save = st.session_state.get(state_key, [])
+        
+    if target_file:
         with open(target_file, 'w', encoding='utf-8') as f:
-            json.dump(st.session_state[state_key], f, default=date_handler, indent=4, ensure_ascii=False)
+            json.dump(data_to_save, f, default=date_handler, indent=4, ensure_ascii=False)
 
 def image_to_base64(uploaded_file):
     if uploaded_file is None: return None
@@ -168,7 +184,7 @@ def logout():
     st.rerun()
 
 # ==================================================
-# 🔐 LOGIN SCREEN (CLEAN & SECURE)
+# 🔐 LOGIN SCREEN (CLEAN)
 # ==================================================
 if not st.session_state.authenticated:
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -219,8 +235,8 @@ if not st.session_state.authenticated:
             else:
                 tab_login, tab_register = st.tabs(["🔑 Σύνδεση", "📝 Εγγραφή"])
                 with tab_login:
-                    username = st.text_input("Username", key="login_user") # Removed placeholders
-                    password = st.text_input("Password", type="password", key="login_pass") # Removed placeholders
+                    username = st.text_input("Username", key="login_user")
+                    password = st.text_input("Password", type="password", key="login_pass")
                     
                     if st.button("🚀 Είσοδος", use_container_width=True, type="primary"): 
                         login_user(username, password)
@@ -258,7 +274,6 @@ else:
         
         st.divider()
 
-        # ΜΕΝΟΥ
         with st.expander("🚜 Διαχείριση & Οργάνωση", expanded=True):
             opt_mng = option_menu(None, ["Dashboard", "Οικονομικά", "Αποθήκη", "Μηχανήματα", "Ημερολόγιο"], 
                 icons=["speedometer2", "wallet2", "box-seam", "truck", "calendar-check"], default_index=0, key="nav_mng")
@@ -270,17 +285,13 @@ else:
         with st.expander("⚙️ Γενικά & Προφίλ", expanded=True):
             gen_options = ["Μηνύματα", "Βοήθεια", "Το Προφίλ μου"]
             gen_icons = ["chat-text", "life-preserver", "person-circle"]
-            
-            # ΕΜΦΑΝΙΣΗ ΜΟΝΟ ΣΕ OWNER/ADMIN
             if is_owner or is_admin:
                 gen_options.append("Διαχείριση Χρηστών")
                 gen_icons.append("people-fill")
-            
             gen_options.append("Logout")
             gen_icons.append("box-arrow-right")
             opt_gen = option_menu(None, gen_options, icons=gen_icons, default_index=0, key="nav_gen")
 
-    # SYNC MENUS
     if 'prev_nav_mng' not in st.session_state: st.session_state.prev_nav_mng = opt_mng
     if 'prev_nav_agro' not in st.session_state: st.session_state.prev_nav_agro = opt_agro
     if 'prev_nav_gen' not in st.session_state: st.session_state.prev_nav_gen = opt_gen
@@ -454,7 +465,6 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            # --- GDD CALC ---
             with st.container(border=True):
                 st.subheader("🧬 Υπολογισμός GDD")
                 c_crop, c_input = st.columns(2)
@@ -490,7 +500,6 @@ else:
 
             st.divider()
             
-            # --- VRT CALCULATOR ---
             with st.container(border=True):
                 st.subheader("🧪 VRT Λίπανση")
                 v1, v2 = st.columns(2)
