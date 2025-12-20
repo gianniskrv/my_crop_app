@@ -16,11 +16,11 @@ import random
 import base64
 from email.message import EmailMessage
 
-# --- 1. PAGE SETTINGS ---
+# --- 1. ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="AgroManager Pro", page_icon="🌱", layout="wide")
 
 # ==============================================================================
-# 📧 EMAIL SETTINGS
+# 📧 ΡΥΘΜΙΣΕΙΣ EMAIL
 # ==============================================================================
 EMAIL_SENDER = "johnkrv1@gmail.com"
 EMAIL_PASSWORD = "bcgb tdmn sjwe ajnt"
@@ -52,7 +52,7 @@ FILES = {
     "messages": "messages.json"
 }
 
-# AGRONOMIC DB
+# ΑΓΡΟΝΟΜΙΚΗ ΒΑΣΗ
 CROP_STANDARDS = {
     "Σιτάρι (Χειμερινό)": {"tbase": 0.0, "target_gdd": 2100},
     "Βαμβάκι": {"tbase": 15.6, "target_gdd": 2200},
@@ -69,27 +69,30 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    # Load existing users
+    # 1. Φόρτωση Χρηστών από το αρχείο
     if os.path.exists(FILES["users"]):
         with open(FILES["users"], 'r', encoding='utf-8') as f:
             st.session_state.users_db = json.load(f)
     else:
         st.session_state.users_db = {}
 
-    # --- SECURITY FIX: FORCE RESET OWNER PASSWORD ---
-    # Ensure GiannisKrv exists and has the correct password/role
-    st.session_state.users_db["GiannisKrv"] = {
-        "password": "change_me",  # Force the correct password
-        "role": "owner",
-        "name": "Γιάννης",
-        "email": "johnkrv1@gmail.com",
-        "phone": ""
-    }
-    
-    # Save the corrected data immediately
-    save_data("users")
+    # 2. Αν δεν υπάρχει καθόλου ο GiannisKrv (π.χ. πρώτη φορά), τον δημιουργούμε.
+    # ΑΛΛΑ αν υπάρχει, ΔΕΝ τον πειράζουμε (για να μην χάνεις αλλαγές).
+    if "GiannisKrv" not in st.session_state.users_db:
+        st.session_state.users_db["GiannisKrv"] = {
+            "password": "change_me", 
+            "role": "owner", 
+            "name": "Γιάννης", 
+            "email": "johnkrv1@gmail.com", 
+            "phone": ""
+        }
+        save_data("users")
 
-    # Load other files
+    # 3. ΑΣΦΑΛΕΙΑ: Επιβάλουμε ΜΟΝΟ τον ρόλο owner, χωρίς να αλλάζουμε τα υπόλοιπα.
+    if "GiannisKrv" in st.session_state.users_db:
+        st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+
+    # 4. Φόρτωση υπολοίπων αρχείων
     for key, file_path in FILES.items():
         if key == "users": continue
         state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
@@ -108,7 +111,7 @@ def load_data():
 def save_data(key):
     target_file = FILES.get(key)
     state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
-    # Special handling for users to grab from users_db instead of _db/_log
+    # Ειδική διαχείριση για users ώστε να σώζει το users_db
     if key == "users":
         data_to_save = st.session_state.users_db
     else:
@@ -124,7 +127,7 @@ def image_to_base64(uploaded_file):
     except: return None
 
 # ==============================================================================
-# 🎨 BEAUTIFUL UI & CSS
+# 🎨 UI & CSS
 # ==============================================================================
 st.markdown("""
 <style>
@@ -184,7 +187,7 @@ def logout():
     st.rerun()
 
 # ==================================================
-# 🔐 LOGIN SCREEN (CLEAN)
+# 🔐 LOGIN SCREEN
 # ==================================================
 if not st.session_state.authenticated:
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -465,6 +468,7 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
+            # --- GDD CALC ---
             with st.container(border=True):
                 st.subheader("🧬 Υπολογισμός GDD")
                 c_crop, c_input = st.columns(2)
@@ -500,6 +504,7 @@ else:
 
             st.divider()
             
+            # --- VRT CALCULATOR ---
             with st.container(border=True):
                 st.subheader("🧪 VRT Λίπανση")
                 v1, v2 = st.columns(2)
@@ -588,20 +593,37 @@ else:
 
     elif selected == "Το Προφίλ μου":
         st.title("👤 Προφίλ")
-        curr_u = st.session_state.current_user
+        
+        # ΑΣΦΑΛΗΣ ΑΝΑΓΝΩΣΗ ΧΡΗΣΤΗ
         curr_uname = st.session_state.current_username
-        with st.form("prof"):
-            new_name = st.text_input("Όνομα", value=curr_u['name'])
-            new_email = st.text_input("Email", value=curr_u['email'])
-            new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
-            st.markdown("---")
-            new_pass = st.text_input("Νέος Κωδικός", type="password")
-            if st.form_submit_button("💾 Αποθήκευση"):
-                st.session_state.users_db[curr_uname]['name'] = new_name
-                st.session_state.users_db[curr_uname]['email'] = new_email
-                st.session_state.users_db[curr_uname]['phone'] = new_phone
-                if new_pass: st.session_state.users_db[curr_uname]['password'] = new_pass
-                save_data("users"); st.success("OK")
+        if curr_uname in st.session_state.users_db:
+            curr_u = st.session_state.users_db[curr_uname]
+            
+            with st.form("prof"):
+                c1, c2 = st.columns(2)
+                new_name = c1.text_input("Ονοματεπώνυμο", value=curr_u.get('name', ''))
+                new_email = c2.text_input("Email", value=curr_u.get('email', ''))
+                new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
+                
+                st.markdown("---")
+                new_pass = st.text_input("Νέος Κωδικός (αφήστε κενό αν δεν θέλετε αλλαγή)", type="password")
+                
+                if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                    st.session_state.users_db[curr_uname]['name'] = new_name
+                    st.session_state.users_db[curr_uname]['email'] = new_email
+                    st.session_state.users_db[curr_uname]['phone'] = new_phone
+                    
+                    if new_pass:
+                        st.session_state.users_db[curr_uname]['password'] = new_pass
+                    
+                    save_data("users")
+                    # Update session object
+                    st.session_state.current_user = st.session_state.users_db[curr_uname]
+                    st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
+                    time.sleep(1)
+                    st.rerun()
+        else:
+            st.error("Σφάλμα φόρτωσης προφίλ. Παρακαλώ κάντε επανασύνδεση.")
 
     elif selected == "Διαχείριση Χρηστών":
         if current_role not in ['owner', 'admin']:
