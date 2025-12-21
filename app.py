@@ -69,53 +69,34 @@ def date_handler(obj):
     return obj
 
 def load_data():
-    """
-    Φορτώνει τα δεδομένα από τον δίσκο στη μνήμη (RAM) κατά την εκκίνηση.
-    ΔΕΝ διαγράφει τίποτα αν υπάρχουν αρχεία.
-    """
-    # 1. Φόρτωση Χρηστών (Users)
     if os.path.exists(FILES["users"]):
-        try:
-            with open(FILES["users"], 'r', encoding='utf-8') as f:
-                st.session_state.users_db = json.load(f)
-        except:
-            st.session_state.users_db = {} # Αν χαλάσει το αρχείο
+        with open(FILES["users"], 'r', encoding='utf-8') as f:
+            st.session_state.users_db = json.load(f)
     else:
         st.session_state.users_db = {}
 
-    # 2. Εξασφάλιση Owner (Χωρίς να πειράζουμε άλλους)
-    # Αν δεν υπάρχει ο Owner, τον φτιάχνουμε.
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
-            "password": "21041414", 
+            "password": "change_me", 
             "role": "owner", 
             "name": "Γιάννης", 
             "email": "johnkrv1@gmail.com", 
             "phone": ""
         }
-    else:
-        # Αν υπάρχει, σιγουρεύουμε μόνο τα credentials (για να μην κλειδωθείς έξω)
-        # Αλλά ΔΕΝ διαγράφουμε τους άλλους χρήστες!
-        st.session_state.users_db["GiannisKrv"]["role"] = "owner"
-        st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
     
-    # Σώζουμε για να είμαστε σίγουροι
+    # Force Owner Role (χωρίς να πειράζουμε κωδικό/τηλέφωνο αν υπάρχουν)
+    st.session_state.users_db["GiannisKrv"]["role"] = "owner"
     save_data("users")
 
-    # 3. Φόρτωση ΟΛΩΝ των άλλων αρχείων
     for key, file_path in FILES.items():
         if key == "users": continue
         
-        if key in ["history", "expenses"]:
-            state_key = f"{key}_log"
-        else:
-            state_key = f"{key}_db"
+        state_key = f"{key}_db" if key not in ["history", "expenses"] else f"{key}_log"
             
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Convert dates back to objects
                     if isinstance(data, list):
                         for d in data:
                             if 'date' in d and isinstance(d['date'], str):
@@ -128,10 +109,6 @@ def load_data():
             st.session_state[state_key] = []
 
 def save_data(key):
-    """
-    Αποθηκεύει τα δεδομένα από τη μνήμη (RAM) στον δίσκο (JSON).
-    Καλείται κάθε φορά που αλλάζει κάτι.
-    """
     target_file = FILES.get(key)
     
     if key == "users":
@@ -151,8 +128,23 @@ def image_to_base64(uploaded_file):
     except: return None
 
 # ==============================================================================
-# 🎨 UI & CSS (Agro Theme)
+# 🎨 UI & CSS (ΜΕ ΚΡΥΦΟ MANAGE APP)
 # ==============================================================================
+
+# --- ΛΟΓΙΚΗ ΑΠΟΚΡΥΨΗΣ ---
+hide_dev_style = ""
+if st.session_state.get('current_username') != "GiannisKrv":
+    hide_dev_style = """
+        <style>
+            #MainMenu {visibility: hidden;} 
+            footer {visibility: hidden;} 
+            header {visibility: hidden;} 
+            .stDeployButton {display:none;} 
+        </style>
+    """
+
+st.markdown(hide_dev_style, unsafe_allow_html=True)
+
 st.markdown("""
 <style>
     /* Dynamic Background */
@@ -189,12 +181,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 👤 AUTH & SESSION INITIALIZATION
+# 👤 AUTH & SESSION
 # ==============================================================================
-if 'data_loaded' not in st.session_state:
-    load_data() # <--- ΦΟΡΤΩΣΗ ΑΠΟ ΔΙΣΚΟ ΠΡΩΤΑ ΑΠΟ ΟΛΑ
-    st.session_state.data_loaded = True
-
+if 'data_loaded' not in st.session_state: load_data(); st.session_state.data_loaded = True
 if 'authenticated' not in st.session_state: st.session_state.authenticated = False
 if 'weather_data' not in st.session_state: st.session_state.weather_data = None
 if 'weather_loc_name' not in st.session_state: st.session_state.weather_loc_name = ""
@@ -219,11 +208,10 @@ def login_user(username, password):
     else: st.error("Ο χρήστης δεν βρέθηκε.")
 
 def register_user(new_user, new_pass, new_name, new_email, new_phone):
-    if new_user in st.session_state.users_db: 
-        st.warning("Το όνομα χρήστη υπάρχει ήδη.")
+    if new_user in st.session_state.users_db: st.warning("Το όνομα χρήστη υπάρχει ήδη.")
     else:
         st.session_state.users_db[new_user] = {"password": new_pass, "role": "user", "name": new_name, "email": new_email, "phone": new_phone}
-        save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ ΣΤΟΝ ΔΙΣΚΟ
+        save_data("users")
         send_email(new_email, "🌱 Καλωσήρθες στο AgroManager Pro", f"Γεια σου {new_name},\n\nΟ λογαριασμός σου δημιουργήθηκε!\nUsername: {new_user}\nPassword: {new_pass}")
         send_email(EMAIL_SENDER, "🔔 Νέα Εγγραφή Χρήστη", f"Νέος χρήστης:\nΌνομα: {new_name}\nUsername: {new_user}\nEmail: {new_email}")
         st.success("Ο λογαριασμός δημιουργήθηκε! Εστάλη email επιβεβαίωσης.")
@@ -254,7 +242,6 @@ if not st.session_state.authenticated:
                     r_name = st.text_input("Ονοματεπώνυμο")
                     r_email = st.text_input("Email")
                     r_phone = st.text_input("Τηλέφωνο")
-                    
                     col_r1, col_r2 = st.columns(2)
                     if col_r1.button("📩 Αποστολή Κωδικού", use_container_width=True, type="primary"):
                         found = False
@@ -271,7 +258,6 @@ if not st.session_state.authenticated:
                                 else: st.error("Σφάλμα Email.")
                         if not found: st.error("Λάθος στοιχεία.")
                     if col_r2.button("Πίσω", use_container_width=True): st.session_state.reset_mode = False; st.rerun()
-
                 elif st.session_state.reset_step == 2:
                     st.success("Κωδικός εστάλη στο email σας.")
                     code_input = st.text_input("6ψήφιος κωδικός OTP:")
@@ -279,7 +265,7 @@ if not st.session_state.authenticated:
                     if st.button("💾 Αποθήκευση", use_container_width=True, type="primary"):
                         if code_input == st.session_state.reset_otp:
                             st.session_state.users_db[st.session_state.reset_username_target]['password'] = new_password
-                            save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
+                            save_data("users")
                             st.success("Ο κωδικός άλλαξε!")
                             st.session_state.reset_mode = False; st.session_state.reset_step = 1; time.sleep(2); st.rerun()
                         else: st.error("Λάθος OTP.")
@@ -288,14 +274,9 @@ if not st.session_state.authenticated:
                 with tab_login:
                     username = st.text_input("Username", key="login_user")
                     password = st.text_input("Password", type="password", key="login_pass")
-                    
-                    if st.button("🚀 Είσοδος", use_container_width=True, type="primary"): 
-                        login_user(username, password)
-                    
+                    if st.button("🚀 Είσοδος", use_container_width=True, type="primary"): login_user(username, password)
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True): 
-                        st.session_state.reset_mode = True; st.rerun()
-
+                    if st.button("🆘 Ξέχασα τον κωδικό μου", type="secondary", use_container_width=True): st.session_state.reset_mode = True; st.rerun()
                 with tab_register:
                     new_user = st.text_input("Username", key="reg_user")
                     new_pass = st.text_input("Password", type="password", key="reg_pass")
@@ -369,23 +350,17 @@ else:
         df_exp = pd.DataFrame(st.session_state.expenses_log)
         rev = df_inc['revenue'].sum() if not df_inc.empty else 0
         exp = df_exp['amount_total'].sum() if not df_exp.empty else 0
-        
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            with st.container(border=True):
-                st.metric("💰 Ταμείο", f"{rev - exp:.2f} €")
+            with st.container(border=True): st.metric("💰 Ταμείο", f"{rev - exp:.2f} €")
         with c2:
-            with st.container(border=True):
-                st.metric("📈 Έσοδα", f"{rev:.2f} €", delta="Σύνολο")
+            with st.container(border=True): st.metric("📈 Έσοδα", f"{rev:.2f} €", delta="Σύνολο")
         with c3:
-            with st.container(border=True):
-                st.metric("💸 Έξοδα", f"{exp:.2f} €", delta="Σύνολο", delta_color="inverse")
+            with st.container(border=True): st.metric("💸 Έξοδα", f"{exp:.2f} €", delta="Σύνολο", delta_color="inverse")
         with c4:
             tasks = st.session_state.calendar_db
             pending = len([t for t in tasks if not t.get('done', False)])
-            with st.container(border=True):
-                st.metric("📅 Εκκρεμότητες", f"{pending}", delta="Εργασίες")
-        
+            with st.container(border=True): st.metric("📅 Εκκρεμότητες", f"{pending}", delta="Εργασίες")
         st.divider()
         if not df_inc.empty:
             df_inc['year'] = pd.to_datetime(df_inc['date']).dt.year
@@ -451,7 +426,6 @@ else:
             if st.form_submit_button("➕ Προσθήκη Εργασίας"):
                 st.session_state.calendar_db.append({"title": tt, "date": td, "done": False})
                 save_data("calendar"); st.rerun()
-        
         st.write("---")
         for i, t in enumerate(st.session_state.calendar_db):
             c1, c2 = st.columns([0.1, 0.9])
@@ -462,11 +436,9 @@ else:
     # --- ΚΑΙΡΟΣ ---
     elif selected == "Καιρός":
         st.title("🌦️ Καιρός & Πρόγνωση")
-        
         mode = st.radio("Τοποθεσία:", ["🔍 Πόλη", "📍 Συντεταγμένες"], horizontal=True)
         lat, lon = 39.6390, 22.4191
         display_name = "Λάρισα"
-        
         if mode == "🔍 Πόλη":
             sc = st.text_input("Πόλη (π.χ. Λάρισα)")
             if sc:
@@ -493,13 +465,11 @@ else:
             d = st.session_state.weather_data
             curr = d.get('current', {})
             st.success(f"📍 {st.session_state.weather_loc_name}")
-            
             c1, c2, c3, c4 = st.columns(4)
             with c1: st.metric("Θερμοκρασία", f"{curr.get('temperature_2m', '-')} °C")
             with c2: st.metric("Υγρασία", f"{curr.get('relative_humidity_2m', '-')} %")
             with c3: st.metric("Βροχή", f"{curr.get('precipitation', '-')} mm")
             with c4: st.metric("Άνεμος", f"{curr.get('wind_speed_10m', '-')} km/h")
-            
             daily = d.get('daily', {})
             if daily:
                 chart_df = pd.DataFrame({"Date": daily['time'], "Max Temp": daily['temperature_2m_max']})
@@ -512,7 +482,15 @@ else:
         
         if not st.session_state.weather_data:
             st.warning("⚠️ Πηγαίνετε στην καρτέλα 'Καιρός' και πατήστε 'Λήψη Καιρού' πρώτα!")
-        else:
+            if st.button("🔄 Λήψη Δεδομένων Καιρού Τώρα"):
+                try:
+                    url = "https://api.open-meteo.com/v1/forecast?latitude=39.6390&longitude=22.4191&daily=temperature_2m_max,temperature_2m_min&past_days=30&timezone=auto"
+                    st.session_state.weather_data = requests.get(url).json()
+                    st.session_state.weather_loc_name = "Λάρισα (Auto)"
+                    st.rerun()
+                except: st.error("Σφάλμα.")
+        
+        if st.session_state.weather_data:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
@@ -520,15 +498,11 @@ else:
             with st.container(border=True):
                 st.subheader("🧬 Υπολογισμός GDD")
                 c_crop, c_input = st.columns(2)
-                
                 selected_standard_key = c_crop.selectbox("Επιλέξτε Είδος", list(CROP_STANDARDS.keys()))
                 crop_data = CROP_STANDARDS[selected_standard_key]
-                
                 final_crop_name = c_input.text_input("Ονομασία Αγροτεμαχίου", value=selected_standard_key)
-                
                 c_var, c_params = st.columns(2)
                 variety_name = c_var.text_input("Ποικιλία", value="Standard")
-                
                 if "Custom" in selected_standard_key:
                     tbase = c_params.number_input("Tbase (°C)", value=10.0)
                     target_gdd = c_params.number_input("Στόχος GDD", value=2000)
@@ -539,20 +513,40 @@ else:
 
                 dates = daily['time']
                 gdd_cum, acc = [], 0
+                tmax_vals, tmin_vals, day_gdd_vals = [], [], []
+
                 for i in range(len(dates)):
-                    avg = (daily['temperature_2m_max'][i] + daily['temperature_2m_min'][i]) / 2
-                    acc += max(avg - tbase, 0)
-                    gdd_cum.append(acc)
+                    tmax = daily['temperature_2m_max'][i]
+                    tmin = daily['temperature_2m_min'][i]
+                    if tmax is not None and tmin is not None:
+                        avg = (tmax + tmin) / 2
+                        day_gdd = max(avg - tbase, 0)
+                        acc += day_gdd
+                        gdd_cum.append(acc)
+                        tmax_vals.append(tmax)
+                        tmin_vals.append(tmin)
+                        day_gdd_vals.append(day_gdd)
                 
-                fig = px.area(pd.DataFrame({"Date": dates, "GDD": gdd_cum}), x='Date', y='GDD', 
-                              title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
+                # Plot
+                df_gdd = pd.DataFrame({"Date": dates, "GDD": gdd_cum})
+                fig = px.area(df_gdd, x='Date', y='GDD', title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
                 fig.add_hline(y=target_gdd, line_dash="dot", line_color="red", annotation_text="Στόχος")
                 st.plotly_chart(fig, use_container_width=True)
                 st.info(f"Συνολικοί Βαθμοί: **{acc:.1f}**")
 
+                # --- NEW TABLE ADDITION ---
+                st.subheader("📋 Αναλυτικός Πίνακας")
+                df_table = pd.DataFrame({
+                    "Ημερομηνία": dates,
+                    "Max Temp (°C)": tmax_vals,
+                    "Min Temp (°C)": tmin_vals,
+                    "Ημερήσιο GDD": day_gdd_vals,
+                    "Συνολικό GDD": gdd_cum
+                })
+                st.dataframe(df_table, use_container_width=True, hide_index=True)
+
             st.divider()
             
-            # --- VRT CALCULATOR ---
             with st.container(border=True):
                 st.subheader("🧪 VRT Λίπανση")
                 v1, v2 = st.columns(2)
@@ -564,13 +558,10 @@ else:
                     if crop_sel == "Βαμβάκι": rem_coef = 4.5
                     elif crop_sel == "Καλαμπόκι": rem_coef = 3.0
                     else: rem_coef = 3.0
-                
                 vrt_variety = v2.text_input("Ποικιλία", key="vrt_var")
                 yld = v2.number_input("Στόχος (kg/στρ)", 400)
-                
                 fert_options = ["Ουρία (46-0-0)", "Νιτρική (34.5-0-0)", "Θειική Αμμωνία (21-0-0)", "NPK (20-20-20)", "Άλλο (Custom)"]
                 fert = v1.selectbox("Λίπασμα", fert_options)
-                
                 n_per = 0.0
                 if fert == "Άλλο (Custom)":
                     custom_n = v1.number_input("Περιεκτικότητα Αζώτου (%)", min_value=1.0, max_value=100.0, value=26.0)
@@ -580,7 +571,6 @@ else:
                     elif "34.5" in fert: n_per = 0.345
                     elif "21" in fert: n_per = 0.21
                     elif "20" in fert: n_per = 0.20
-                
                 dose = ((yld/100)*rem_coef) / n_per / 0.8
                 st.success(f"👉 Δόση: **{dose:.1f} kg/στρ**")
 
@@ -596,7 +586,6 @@ else:
             tab_inbox, tab_sent, tab_global = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα", "🌐 Global"])
         else:
             tab_inbox, tab_sent = st.tabs(["📥 Εισερχόμενα", "📤 Απεσταλμένα"])
-        
         with st.expander("✉️ Νέο Μήνυμα"):
             with st.form("msg_form"):
                 recipients = list(st.session_state.users_db.keys()) if (is_owner or is_admin) else ["Support"]
@@ -606,13 +595,9 @@ else:
                 body = st.text_area("Μήνυμα")
                 if st.form_submit_button("🚀 Αποστολή"):
                     st.session_state.messages_db.append({"from": st.session_state.current_username, "to": to_user, "subject": subj, "body": body, "timestamp": str(datetime.now())})
-                    save_data("messages") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
-                    st.success("Εστάλη!")
-                    st.rerun()
-
+                    save_data("messages"); st.success("Εστάλη!"); st.rerun()
         my_inbox = [m for m in st.session_state.messages_db if m.get('to') == st.session_state.current_username or (m.get('to') == "Support" and (is_owner or is_admin))]
         my_sent = [m for m in st.session_state.messages_db if m.get('from') == st.session_state.current_username]
-
         with tab_inbox:
             for m in reversed(my_inbox):
                 with st.container(border=True):
@@ -620,11 +605,8 @@ else:
                     with st.expander("Διαβάστε"):
                         st.write(m.get('body'))
                         if m.get('image'): st.image(base64.b64decode(m.get('image')))
-
         with tab_sent:
-            for m in reversed(my_sent):
-                st.info(f"Προς: {m.get('to')} | {m.get('body')}")
-
+            for m in reversed(my_sent): st.info(f"Προς: {m.get('to')} | {m.get('body')}")
         if is_owner:
             with tab_global: st.dataframe(pd.DataFrame(st.session_state.messages_db))
 
@@ -637,9 +619,7 @@ else:
             if st.form_submit_button("🚀 Αποστολή"):
                 img_str = image_to_base64(img)
                 st.session_state.messages_db.append({"from": st.session_state.current_username, "to": "Support", "subject": f"[TICKET] {sub}", "body": desc, "image": img_str, "timestamp": str(datetime.now())})
-                save_data("messages") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
-                send_email(EMAIL_SENDER, "Ticket", f"{sub}\n{desc}")
-                st.success("OK")
+                save_data("messages"); send_email(EMAIL_SENDER, "Ticket", f"{sub}\n{desc}"); st.success("OK")
 
     elif selected == "Το Προφίλ μου":
         st.title("👤 Προφίλ")
@@ -658,59 +638,32 @@ else:
                     st.session_state.users_db[curr_uname]['email'] = new_email
                     st.session_state.users_db[curr_uname]['phone'] = new_phone
                     if new_pass: st.session_state.users_db[curr_uname]['password'] = new_pass
-                    save_data("users") # <--- ΑΜΕΣΗ ΑΠΟΘΗΚΕΥΣΗ
-                    st.session_state.current_user = st.session_state.users_db[curr_uname]
-                    st.success("Το προφίλ ενημερώθηκε επιτυχώς!")
-                    time.sleep(1)
-                    st.rerun()
-        else:
-            st.error("Σφάλμα φόρτωσης προφίλ.")
+                    save_data("users"); st.session_state.current_user = st.session_state.users_db[curr_uname]; st.success("Το προφίλ ενημερώθηκε επιτυχώς!"); time.sleep(1); st.rerun()
+        else: st.error("Σφάλμα φόρτωσης προφίλ.")
 
     elif selected == "Διαχείριση Χρηστών":
-        if current_role not in ['owner', 'admin']:
-            st.error("⛔ Απαγορεύεται η πρόσβαση.")
+        if current_role not in ['owner', 'admin']: st.error("⛔ Απαγορεύεται η πρόσβαση.")
         else:
             st.title("👥 Διαχείριση Χρηστών")
             c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 2])
-            c1.markdown("**Username**")
-            c2.markdown("**Όνομα**")
-            c3.markdown("**Email**")
-            c4.markdown("**Credentials**")
-            c5.markdown("**Role**")
-            c6.markdown("**Show/Hide**")
+            c1.markdown("**Username**"); c2.markdown("**Όνομα**"); c3.markdown("**Email**"); c4.markdown("**Credentials**"); c5.markdown("**Role**"); c6.markdown("**Show/Hide**")
             st.divider()
-            
             for uname, udata in st.session_state.users_db.items():
                 c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 3, 2, 2, 2])
-                c1.write(uname)
-                c2.write(udata['name'])
-                c3.write(udata['email'])
-                
+                c1.write(uname); c2.write(udata['name']); c3.write(udata['email'])
                 key_vis = f"vis_{uname}"
                 if key_vis not in st.session_state: st.session_state[key_vis] = False
-                
                 if st.session_state[key_vis]:
-                    c4.warning(f"🔑: {udata['password']}")
-                    c4.caption(f"📞: {udata.get('phone', '-')}")
-                    icon = "🙈 Hide"
-                else:
-                    c4.write("******")
-                    icon = "👁️ Show"
-                
-                if c6.button(icon, key=f"btn_{uname}"):
-                    st.session_state[key_vis] = not st.session_state[key_vis]
-                    st.rerun()
-
+                    c4.warning(f"🔑: {udata['password']}"); c4.caption(f"📞: {udata.get('phone', '-')}"); icon = "🙈 Hide"
+                else: c4.write("******"); icon = "👁️ Show"
+                if c6.button(icon, key=f"btn_{uname}"): st.session_state[key_vis] = not st.session_state[key_vis]; st.rerun()
                 u_role = udata.get('role', 'user')
                 if is_owner:
                     if uname == "GiannisKrv": c5.success("OWNER")
                     else:
                         new_r = c5.selectbox("", ["user", "admin"], index=0 if u_role=="user" else 1, key=f"r_{uname}", label_visibility="collapsed")
-                        if new_r != u_role:
-                            st.session_state.users_db[uname]['role'] = new_r
-                            save_data("users"); st.rerun()
-                else:
-                    c5.write(u_role.upper())
+                        if new_r != u_role: st.session_state.users_db[uname]['role'] = new_r; save_data("users"); st.rerun()
+                else: c5.write(u_role.upper())
                 st.markdown("---")
 
     elif selected == "Logout":
