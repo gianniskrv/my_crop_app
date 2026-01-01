@@ -69,25 +69,36 @@ def date_handler(obj):
     return obj
 
 def load_data():
+    # 1. Φόρτωση Χρηστών
     if os.path.exists(FILES["users"]):
-        with open(FILES["users"], 'r', encoding='utf-8') as f:
-            st.session_state.users_db = json.load(f)
+        try:
+            with open(FILES["users"], 'r', encoding='utf-8') as f:
+                st.session_state.users_db = json.load(f)
+        except:
+            st.session_state.users_db = {}
     else:
         st.session_state.users_db = {}
 
+    # --- EMERGENCY FIX: FORCE PASSWORD UPDATE ---
+    # Αυτό το κομμάτι τρέχει ΠΑΝΤΑ και διορθώνει τον κωδικό σου
+    # ακόμα και αν έχει αποθηκευτεί λάθος στο παρελθόν.
+    
+    # Αν δεν υπάρχει, τον φτιάχνουμε
     if "GiannisKrv" not in st.session_state.users_db:
         st.session_state.users_db["GiannisKrv"] = {
-            "password": "change_me", 
-            "role": "owner", 
             "name": "Γιάννης", 
             "email": "johnkrv1@gmail.com", 
             "phone": ""
         }
     
-    # Force Owner Role (χωρίς να πειράζουμε κωδικό/τηλέφωνο αν υπάρχουν)
+    # ΚΑΡΦΩΤΗ ΑΝΑΝΕΩΣΗ ΚΩΔΙΚΟΥ ΚΑΙ ΡΟΛΟΥ
+    st.session_state.users_db["GiannisKrv"]["password"] = "21041414"
     st.session_state.users_db["GiannisKrv"]["role"] = "owner"
+    
+    # Σώζουμε αμέσως την αλλαγή
     save_data("users")
 
+    # 3. Φόρτωση ΟΛΩΝ των άλλων αρχείων
     for key, file_path in FILES.items():
         if key == "users": continue
         
@@ -131,7 +142,6 @@ def image_to_base64(uploaded_file):
 # 🎨 UI & CSS (ΜΕ ΚΡΥΦΟ MANAGE APP)
 # ==============================================================================
 
-# --- ΛΟΓΙΚΗ ΑΠΟΚΡΥΨΗΣ ---
 hide_dev_style = ""
 if st.session_state.get('current_username') != "GiannisKrv":
     hide_dev_style = """
@@ -197,13 +207,22 @@ if 'reset_email_target' not in st.session_state: st.session_state.reset_email_ta
 if 'reset_username_target' not in st.session_state: st.session_state.reset_username_target = None
 
 def login_user(username, password):
-    if username in st.session_state.users_db:
+    # Επαναφόρτωση για να είμαστε σίγουροι ότι βλέπουμε την τελευταία έκδοση
+    if username == "GiannisKrv" and password == "21041414":
+        st.session_state.authenticated = True
+        st.session_state.current_user = st.session_state.users_db["GiannisKrv"]
+        st.session_state.current_username = username
+        st.success(f"Καλωσήρθες {st.session_state.current_user['name']}!")
+        time.sleep(0.5)
+        st.rerun()
+    elif username in st.session_state.users_db:
         if st.session_state.users_db[username]['password'] == password:
             st.session_state.authenticated = True
             st.session_state.current_user = st.session_state.users_db[username]
             st.session_state.current_username = username
             st.success(f"Καλωσήρθες {st.session_state.current_user['name']}!")
-            time.sleep(0.5); st.rerun()
+            time.sleep(0.5)
+            st.rerun()
         else: st.error("Λάθος κωδικός.")
     else: st.error("Ο χρήστης δεν βρέθηκε.")
 
@@ -476,7 +495,7 @@ else:
                 st.subheader("📈 Διάγραμμα Θερμοκρασίας")
                 st.line_chart(chart_df.set_index("Date"))
 
-    # --- GDD & TOOLS ---
+    # --- GDD ---
     elif selected == "GDD & Ανάπτυξη":
         st.title("📈 Ανάπτυξη & Εργαλεία")
         
@@ -494,7 +513,6 @@ else:
             d = st.session_state.weather_data
             daily = d.get('daily', {})
             
-            # --- GDD CALC ---
             with st.container(border=True):
                 st.subheader("🧬 Υπολογισμός GDD")
                 c_crop, c_input = st.columns(2)
@@ -527,14 +545,11 @@ else:
                         tmin_vals.append(tmin)
                         day_gdd_vals.append(day_gdd)
                 
-                # Plot
-                df_gdd = pd.DataFrame({"Date": dates, "GDD": gdd_cum})
-                fig = px.area(df_gdd, x='Date', y='GDD', title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
+                fig = px.area(pd.DataFrame({"Date": dates, "GDD": gdd_cum}), x='Date', y='GDD', title=f"Πρόοδος: {final_crop_name} ({variety_name})", color_discrete_sequence=['#2e7d32'])
                 fig.add_hline(y=target_gdd, line_dash="dot", line_color="red", annotation_text="Στόχος")
                 st.plotly_chart(fig, use_container_width=True)
                 st.info(f"Συνολικοί Βαθμοί: **{acc:.1f}**")
 
-                # --- NEW TABLE ADDITION ---
                 st.subheader("📋 Αναλυτικός Πίνακας")
                 df_table = pd.DataFrame({
                     "Ημερομηνία": dates,
@@ -632,7 +647,7 @@ else:
                 new_email = c2.text_input("Email", value=curr_u.get('email', ''))
                 new_phone = st.text_input("Τηλέφωνο", value=curr_u.get('phone', ''))
                 st.markdown("---")
-                new_pass = st.text_input("Νέος Κωδικός", type="password")
+                new_pass = st.text_input("Νέος Κωδικός (αφήστε κενό αν δεν θέλετε αλλαγή)", type="password")
                 if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
                     st.session_state.users_db[curr_uname]['name'] = new_name
                     st.session_state.users_db[curr_uname]['email'] = new_email
